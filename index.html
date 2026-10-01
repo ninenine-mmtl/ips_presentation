@@ -145,7 +145,7 @@
   
   <div class="header-actions">
     <div id="authButtons">
-      <button onclick="showLogin()">Login (Admin / Judge)</button>
+      <button onclick="showLogin()">Login (Admin / Judge / Observer)</button>
     </div>
     <div id="userMenu" style="display:none; align-items: center; gap: 10px;">
       <span id="welcomeMsg" style="font-weight: bold; color: white;"></span>
@@ -234,10 +234,17 @@
         <button onclick="addStudent()">Add Student</button>
       </div>
       <div class="card" style="flex: 1; min-width: 300px;">
-        <h3>Create Judge / Observer</h3>
-        <input type="text" id="judgeName" placeholder="Name (e.g., Judge Mary or Observer John)">
+        <h3>Create Judge</h3>
+        <input type="text" id="judgeName" placeholder="Name (e.g., Judge Mary)">
         <input type="password" id="judgePassword" maxlength="4" placeholder="Set 4-Digit PIN" inputmode="numeric">
-        <button onclick="addJudge()">Create Account</button>
+        <button onclick="addJudge()">Create Judge</button>
+      </div>
+      <div class="card" style="flex: 1; min-width: 300px;">
+        <h3>Create Observer</h3>
+        <p style="font-size:0.8rem; color:#ccc;">Observers can watch live scores and logs securely.</p>
+        <input type="text" id="observerName" placeholder="Name (e.g., Observer John)">
+        <input type="password" id="observerPassword" maxlength="4" placeholder="Set 4-Digit PIN" inputmode="numeric">
+        <button onclick="addObserver()">Create Observer</button>
       </div>
     </div>
 
@@ -274,6 +281,19 @@
         <table>
           <thead><tr><th>Name</th><th>PIN (4-Digits)</th><th>Forbidden Townships (comma-separated)</th><th>Actions</th></tr></thead>
           <tbody id="adminJudgeList"></tbody>
+        </table>
+      </div>
+    </div>
+    
+    <!-- Observer Management -->
+    <div class="card">
+      <div class="card-header-flex">
+        <h3 style="border:none; margin:0; font-size: 1.3rem;">Manage Observers</h3>
+      </div>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Name</th><th>PIN (4-Digits)</th><th>Actions</th></tr></thead>
+          <tbody id="adminObserverList"></tbody>
         </table>
       </div>
     </div>
@@ -379,6 +399,40 @@
       </div>
     </div>
   </div>
+
+  <!-- =============================== -->
+  <!-- 5. OBSERVER PRIVATE ROOM -->
+  <!-- =============================== -->
+  <div id="observerView" class="view-section">
+    <div class="card" style="border-width: 2px;">
+      <h2>👀 Observer Dashboard</h2>
+      <p style="font-size:0.95rem; color:#ccc;">You have secure, read-only access to all system activity, logs, and score submissions in real-time.</p>
+      <button class="nav-btn" onclick="showView('publicView')" style="margin-top: 10px;">Return to Public Leaderboard</button>
+    </div>
+
+    <!-- Live Logs -->
+    <div class="card">
+      <div class="card-header-flex">
+        <h3 style="border:none; margin:0; font-size: 1.3rem;">Real-Time System Logs</h3>
+      </div>
+      <div style="max-height: 200px; overflow-y: auto; background: #020C1B; padding: 15px; border-radius: 8px;">
+        <ul id="observerLogsList" class="log-list"></ul>
+      </div>
+    </div>
+
+    <!-- Master Voting History -->
+    <div class="card">
+      <h3>Full Master Voting History</h3>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr><th>Student</th><th>Judge</th><th>Scores (Pronunciation, Grammar, Fluency, Q&A, Content, Delivery)</th><th>Total</th></tr>
+          </thead>
+          <tbody id="observerVotingHistory"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
@@ -392,7 +446,7 @@
   Parse.serverURL = 'https://parseapi.back4app.com/';
   // ==========================================
 
-  let db = { students: [], judges: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [], presence: {} };
+  let db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [], presence: {} };
   let currentUser = null; 
   let expandedRows = new Set(); 
   const genId = () => Math.random().toString(36).substr(2, 9);
@@ -431,6 +485,7 @@
           db = {
             students: data.students || [],
             judges: data.judges || [],
+            observers: data.observers || [],
             scores: data.scores || {},
             settings: data.settings || { votingOpen: true, adminPin: '0000' },
             logs: data.logs || [],
@@ -439,7 +494,7 @@
           if(!db.settings.adminPin) db.settings.adminPin = '0000';
         }
       } else {
-        db = { students: [], judges: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [], presence: {} };
+        db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [], presence: {} };
         const newDoc = new AppData();
         newDoc.set("payload", db);
         const saved = await newDoc.save();
@@ -481,14 +536,19 @@
     if (currentUser?.role === 'admin') {
       renderAdminStudentList();
       renderAdminJudgeList();
+      renderAdminObserverList();
       updateAdminToggleBtn();
-      renderAdminLogs();
-      renderAdminHistory();
+      renderAdminLogs('adminLogsList');
+      renderAdminHistory('adminVotingHistory');
     }
     if (currentUser?.role === 'judge') {
       populateJudgeStudents();
       renderJudgeHistory();
       updateJudgeFormState();
+    }
+    if (currentUser?.role === 'observer') {
+      renderAdminLogs('observerLogsList');
+      renderAdminHistory('observerVotingHistory');
     }
   }
 
@@ -519,16 +579,29 @@
         currentUser = { role: 'judge', id: judge.id, name: judge.name };
         document.getElementById('authButtons').style.display = 'none';
         document.getElementById('userMenu').style.display = 'flex';
-        document.getElementById('welcomeMsg').innerText = `Account: ${judge.name}`;
+        document.getElementById('welcomeMsg').innerText = `Judge: ${judge.name}`;
         
-        // Removed PIN broadcast from logs and toast
-        pushLog(`Access: ${judge.name} logged in.`);
-        showToast(`Login Alert: ${judge.name} has joined the session.`);
+        pushLog(`Access: Judge ${judge.name} logged in.`);
+        showToast(`Login Alert: Judge ${judge.name} has joined the session.`);
         
         updatePresence();
         showView('judgeView');
       } else {
-        alert("Incorrect PIN!");
+        const observer = (db.observers || []).find(o => o.password === pwd);
+        if (observer) {
+          currentUser = { role: 'observer', id: observer.id, name: observer.name };
+          document.getElementById('authButtons').style.display = 'none';
+          document.getElementById('userMenu').style.display = 'flex';
+          document.getElementById('welcomeMsg').innerText = `Observer: ${observer.name}`;
+          
+          pushLog(`Access: Observer ${observer.name} logged in.`);
+          showToast(`Login Alert: Observer ${observer.name} is watching.`);
+          
+          updatePresence();
+          showView('observerView');
+        } else {
+          alert("Incorrect PIN!");
+        }
       }
     }
   }
@@ -612,7 +685,7 @@
     reader.readAsText(file);
   }
 
-  /* JUDGE / OBSERVER MANAGEMENT */
+  /* JUDGE MANAGEMENT */
   function addJudge() {
     const name = document.getElementById('judgeName').value;
     const pwd = document.getElementById('judgePassword').value;
@@ -623,10 +696,10 @@
     if (pwd === adminPin) return alert("Cannot use the Admin PIN.");
     
     db.judges.push({ id: genId(), name, password: pwd, forbiddenTownships: "" });
-    pushLog(`System: Admin created Judge/Observer '${name}'.`);
+    pushLog(`System: Admin created Judge '${name}'.`);
     saveData();
     document.getElementById('judgeName').value = ''; document.getElementById('judgePassword').value = '';
-    alert(`Account for ${name} created!`);
+    alert(`Judge ${name} created!`);
   }
 
   function renderAdminJudgeList() {
@@ -653,23 +726,23 @@
       judge.name = document.getElementById(`jName_${id}`).value;
       judge.password = newPwd;
       judge.forbiddenTownships = document.getElementById(`jForb_${id}`).value;
-      pushLog(`System: Admin updated restrictions/settings for Judge/Observer '${judge.name}'.`);
+      pushLog(`System: Admin updated restrictions for Judge '${judge.name}'.`);
       saveData();
-      alert("Account details updated!");
+      alert("Judge details updated!");
     }
   }
 
   function removeJudge(id) {
     const judge = db.judges.find(j => j.id === id);
-    if(judge && confirm("Delete this account? Their previously submitted scores will remain.")) {
+    if(judge && confirm("Delete this judge account? Their previously submitted scores will remain.")) {
       db.judges = db.judges.filter(j => j.id !== id);
-      pushLog(`System: Admin deleted account '${judge.name}'.`);
+      pushLog(`System: Admin deleted Judge '${judge.name}'.`);
       saveData();
     }
   }
 
   function exportJudges() {
-    if (!db.judges || db.judges.length === 0) return alert("No accounts to backup.");
+    if (!db.judges || db.judges.length === 0) return alert("No judges to backup.");
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db.judges));
     const dlAnchorElem = document.createElement('a');
     dlAnchorElem.setAttribute("href", dataStr);
@@ -685,21 +758,61 @@
       try {
         const imported = JSON.parse(e.target.result);
         if (!Array.isArray(imported)) throw new Error("Invalid format");
-        if (confirm(`Import ${imported.length} accounts? This will add them to the existing list.`)) {
+        if (confirm(`Import ${imported.length} judges? This will add them to the existing list.`)) {
           db.judges = db.judges.concat(imported);
-          pushLog(`System: Admin imported ${imported.length} accounts.`);
+          pushLog(`System: Admin imported ${imported.length} judges.`);
           saveData();
-          alert("Accounts imported successfully!");
+          alert("Judges imported successfully!");
         }
-      } catch (err) { alert("Error reading file. Invalid format."); }
+      } catch (err) { alert("Error reading judge file. Invalid format."); }
       event.target.value = '';
     };
     reader.readAsText(file);
   }
 
-  /* SYSTEM LOGS & MASTER HISTORY */
-  function renderAdminLogs() {
-    const list = document.getElementById('adminLogsList');
+  /* OBSERVER MANAGEMENT */
+  function addObserver() {
+    const name = document.getElementById('observerName').value;
+    const pwd = document.getElementById('observerPassword').value;
+    const adminPin = db.settings.adminPin || '0000';
+    
+    if (!name || !pwd) return;
+    if (!/^\d{4}$/.test(pwd)) return alert("PIN must be exactly 4 digits (0-9).");
+    if (pwd === adminPin) return alert("Cannot use the Admin PIN.");
+    if (!db.observers) db.observers = [];
+    
+    db.observers.push({ id: genId(), name, password: pwd });
+    pushLog(`System: Admin created Observer '${name}'.`);
+    saveData();
+    document.getElementById('observerName').value = ''; document.getElementById('observerPassword').value = '';
+    alert(`Observer ${name} created!`);
+  }
+
+  function renderAdminObserverList() {
+    const tbody = document.getElementById('adminObserverList');
+    tbody.innerHTML = '';
+    (db.observers || []).forEach(o => {
+      tbody.innerHTML += `<tr>
+        <td>${o.name}</td>
+        <td><input type="password" id="oPass_${o.id}" class="table-input" value="${o.password}" maxlength="4" readonly style="background:transparent; border:none; padding:0; width:50px;"></td>
+        <td><button class="danger-btn" onclick="removeObserver('${o.id}')">Delete</button></td>
+      </tr>`;
+    });
+  }
+
+  function removeObserver(id) {
+    const observer = db.observers.find(o => o.id === id);
+    if(observer && confirm("Delete this observer account?")) {
+      db.observers = db.observers.filter(o => o.id !== id);
+      pushLog(`System: Admin deleted Observer '${observer.name}'.`);
+      saveData();
+    }
+  }
+
+  /* SYSTEM LOGS & MASTER HISTORY (Reusable for Admin and Observer) */
+  function renderAdminLogs(elementId) {
+    const list = document.getElementById(elementId);
+    if (!list) return;
     list.innerHTML = '';
     if (db.logs.length === 0) return list.innerHTML = '<li>No system events logged yet.</li>';
     [...db.logs].reverse().forEach(log => {
@@ -717,8 +830,8 @@
     dlAnchorElem.click();
   }
 
-  function renderAdminHistory() {
-    const tbody = document.getElementById('adminVotingHistory');
+  function renderAdminHistory(elementId) {
+    const tbody = document.getElementById(elementId);
     if(!tbody) return;
     tbody.innerHTML = '';
     let hasVotes = false;
@@ -766,7 +879,7 @@
 
   function clearAllData() {
     if (confirm("WARNING: Deletes all data globally from the cloud! Are you sure?")) {
-      db = { students: [], judges: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000' }, logs: [], presence: {} };
+      db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000' }, logs: [], presence: {} };
       pushLog("System: ALL DATA FACTORY RESET BY ADMIN.");
       saveData();
     }
@@ -779,7 +892,7 @@
     if (pin === adminPin) {
       if (confirm("STEP 2: ALL DATA WILL BE DELETED GLOABLLY. Are you absolutely sure?")) {
         if (confirm("FINAL WARNING: Click OK to factory reset the entire database. This cannot be undone.")) {
-          db = { students: [], judges: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin }, logs: [], presence: {} };
+          db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin }, logs: [], presence: {} };
           pushLog("System: ALL DATA FACTORY RESET FROM PUBLIC PAGE.");
           saveData();
           alert("Database has been successfully wiped.");
@@ -809,7 +922,7 @@
     const judge = db.judges.find(j => j.id === currentUser.id);
     if (judge) {
       judge.password = newPin;
-      pushLog(`Security: Account '${judge.name}' changed their PIN.`);
+      pushLog(`Security: Judge '${judge.name}' changed their PIN.`);
       saveData();
       document.getElementById('judgeNewPin').value = '';
       alert("Your PIN has been updated!");
