@@ -109,10 +109,10 @@
   .log-list li { padding: 8px 0; border-bottom: 1px dashed #233554; }
   .log-timestamp { color: #FFC107; margin-right: 10px; }
 
-  /* Slide-in Toast Notifications - Slowed Down Animation */
+  /* Slide-in Toast Notifications - Slowed down to 1.5s as requested */
   #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
   .toast { background: rgba(17, 34, 64, 0.95); border-left: 4px solid #FFC107; color: white; padding: 15px 20px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 0.9rem; 
-           animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards, fadeOut 0.8s 5s ease-in forwards; pointer-events: auto; }
+           animation: slideIn 1.5s ease-out forwards, fadeOut 1.5s 5s ease-in forwards; pointer-events: auto; }
   @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
   @keyframes fadeOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
 
@@ -270,7 +270,7 @@
       </div>
     </div>
 
-    <!-- Judge Management & Backup -->
+    <!-- Judge Management & Checkbox Restrictions -->
     <div class="card">
       <div class="card-header-flex">
         <h3 style="border:none; margin:0; font-size: 1.3rem;">Manage Judges & Restrictions</h3>
@@ -482,14 +482,17 @@
   const genId = () => Math.random().toString(36).substr(2, 9);
   let parseDocId = null;
 
-  // HASH RENDERING LOCKS - Prevents the screen from overwriting your typing!
+  // SMART VIRTUAL DOM LOCKS - Prevents the screen from overwriting or flashing!
   let lastStudentHash = "";
   let lastJudgeHash = "";
   let lastObserverHash = "";
+  let lastJudgeStudentHash = "";
+  let lastJudgeHistoryHash = "";
+  let lastAdminHistoryHash = "";
+  let lastLeaderboardHash = "";
   let forceStudentRender = true;
   let forceJudgeRender = true;
   let forceObserverRender = true;
-  window.isSaving = false;
 
   // Toast Notification Logic
   function createToastContainer() {
@@ -508,18 +511,14 @@
     toast.className = 'toast';
     toast.innerText = message;
     container.appendChild(toast);
-    setTimeout(() => toast.remove(), 5800);
+    setTimeout(() => toast.remove(), 6000);
   }
 
   async function fetchDb() {
-    if (window.isSaving) return; // Prevent overwriting during manual saves
-
     const AppData = Parse.Object.extend("AppData");
     const query = new Parse.Query(AppData);
     try {
       const results = await query.find();
-      if (window.isSaving) return; 
-
       if (results.length > 0) {
         parseDocId = results[0].id;
         const data = results[0].get("payload");
@@ -549,11 +548,9 @@
   }
 
   async function saveData(silent = false) { 
-    window.isSaving = true; 
     if (!parseDocId) {
         await fetchDb();
     }
-    
     const AppData = Parse.Object.extend("AppData");
     const obj = new AppData();
     obj.id = parseDocId;
@@ -561,35 +558,22 @@
     
     try {
         await obj.save();
-        setTimeout(() => { window.isSaving = false; }, 500);
         if (!silent) showToast("Changes saved successfully!");
     } catch (error) {
-        window.isSaving = false;
         if (!silent) showToast("Error saving data: " + error.message); 
     }
   }
   
   function pushLog(msg) { db.logs.push({ time: new Date().toLocaleTimeString(), message: msg }); }
 
-  // Isolated Presence Update
-  async function updatePresence() {
-    if (!currentUser || !parseDocId || window.isSaving) return; 
-    
+  // Updates presence ONLY upon login to prevent background race condition saving.
+  function updatePresenceOnLogin() {
+    if (!currentUser) return;
     const id = (currentUser.role === 'admin' ? 'admin' : currentUser.id);
     const name = (currentUser.role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name);
-    
-    const AppData = Parse.Object.extend("AppData");
-    const query = new Parse.Query(AppData);
-    try {
-        const results = await query.find();
-        if (results.length > 0) {
-            const serverData = results[0].get("payload");
-            if (!serverData.presence) serverData.presence = {};
-            serverData.presence[id] = { name: name, time: Date.now() };
-            results[0].set("payload", serverData);
-            await results[0].save();
-        }
-    } catch (e) {}
+    if (!db.presence) db.presence = {};
+    db.presence[id] = { name: name, time: Date.now() };
+    saveData(true); 
   }
 
   function updateUI() {
@@ -601,7 +585,7 @@
       renderAdminObserverList();
       updateAdminToggleBtn();
       renderAdminLogs('adminLogsList');
-      renderAdminHistory('adminVotingHistory'); // Scores live update instantly
+      renderAdminHistory('adminVotingHistory'); 
     }
     if (currentUser?.role === 'judge') {
       populateJudgeStudents();
@@ -636,7 +620,7 @@
       pushLog(`Access: Admin (U Nine Nine) logged in.`);
       showToast(`Welcome back, U Nine Nine.`);
       forceStudentRender = forceJudgeRender = forceObserverRender = true;
-      updatePresence();
+      updatePresenceOnLogin();
       showView('adminView');
     } else {
       const judge = db.judges.find(j => j.password === pwd);
@@ -649,7 +633,7 @@
         pushLog(`Access: Judge ${judge.name} logged in.`);
         showToast(`Login Alert: Judge ${judge.name} has joined the session.`);
         
-        updatePresence();
+        updatePresenceOnLogin();
         showView('judgeView');
       } else {
         const observer = (db.observers || []).find(o => o.password === pwd);
@@ -662,7 +646,7 @@
           pushLog(`Access: Observer ${observer.name} logged in.`);
           showToast(`Login Alert: Observer ${observer.name} is watching.`);
           
-          updatePresence();
+          updatePresenceOnLogin();
           showView('observerView');
         } else {
           showToast("Incorrect PIN!");
@@ -671,7 +655,17 @@
     }
   }
 
-  function logout() { currentUser = null; document.getElementById('authButtons').style.display = 'block'; document.getElementById('userMenu').style.display = 'none'; showView('publicView'); }
+  function logout() { 
+    if (currentUser) {
+        const id = (currentUser.role === 'admin' ? 'admin' : currentUser.id);
+        delete db.presence[id];
+        saveData(true); 
+    }
+    currentUser = null; 
+    document.getElementById('authButtons').style.display = 'block'; 
+    document.getElementById('userMenu').style.display = 'none'; 
+    showView('publicView'); 
+  }
 
   function updateHeaderStatus() {
     const badge = document.getElementById('globalVotingStatus');
@@ -698,7 +692,7 @@
     if (!name || !twp) return;
     db.students.push({ id: genId(), name, township: twp });
     pushLog(`System: Admin added student '${name}'.`);
-    forceStudentRender = forceJudgeRender = true; // Refresh lists
+    forceStudentRender = forceJudgeRender = true; 
     saveData();
     document.getElementById('studentName').value = ''; document.getElementById('studentTownship').value = '';
   }
@@ -728,7 +722,7 @@
 
   function renderAdminStudentList() {
     const newHash = JSON.stringify(db.students);
-    if (lastStudentHash === newHash && !forceStudentRender) return; // Smart DOM check
+    if (lastStudentHash === newHash && !forceStudentRender) return; 
     lastStudentHash = newHash;
     forceStudentRender = false;
 
@@ -787,8 +781,8 @@
   }
 
   function renderAdminJudgeList() {
-    const newHash = JSON.stringify(db.judges);
-    // If the database array of judges hasn't structurally changed, DO NOT REDRAW. This protects user typing!
+    const newHash = JSON.stringify(db.judges) + JSON.stringify(db.students);
+    // Hash check: if the database hasn't structurally changed, it skips rendering to protect your clicking/typing.
     if (lastJudgeHash === newHash && !forceJudgeRender) return;
     lastJudgeHash = newHash;
     forceJudgeRender = false;
@@ -796,26 +790,26 @@
     const tbody = document.getElementById('adminJudgeList');
     tbody.innerHTML = '';
     
-    // Dynamically pull all unique townships from the students list
+    // Automatically extract exact, unique township names directly from the Student database!
     const allTownships = [...new Set(db.students.map(s => s.township.trim()))].filter(Boolean);
 
     db.judges.forEach(j => {
       let currentForb = (j.forbiddenTownships || '').split(',').map(s => s.trim().toLowerCase());
       
-      // Build interactive checkboxes
+      // Builds responsive Checkboxes for each unique township.
       let checkboxesHTML = allTownships.map(t => {
         let isChecked = currentForb.includes(t.toLowerCase()) ? 'checked' : '';
-        return `<label style="display:inline-flex; align-items:center; margin-right:8px; margin-bottom:5px; font-size:0.85rem; color:#ccc;">
-                  <input type="checkbox" class="jForbCheck_${j.id}" value="${t}" ${isChecked} style="margin:0 4px 0 0; width:auto;"> ${t}
+        return `<label style="display:inline-flex; align-items:center; margin-right:10px; margin-bottom:5px; font-size:0.85rem; color:#ccc; cursor:pointer;">
+                  <input type="checkbox" class="jForbCheck_${j.id}" value="${t}" ${isChecked} style="margin:0 5px 0 0; width:auto; cursor:pointer;"> ${t}
                 </label>`;
       }).join('');
       
-      if (allTownships.length === 0) checkboxesHTML = `<span style="font-size:0.8rem; color:#777;">Add students to generate townships</span>`;
+      if (allTownships.length === 0) checkboxesHTML = `<span style="font-size:0.8rem; color:#777;">Add students first to generate checklist</span>`;
 
       tbody.innerHTML += `<tr>
         <td><input type="text" id="jName_${j.id}" class="table-input" value="${j.name}"></td>
         <td><input type="password" id="jPass_${j.id}" class="table-input" value="${j.password}" maxlength="4" style="width:70px;"></td>
-        <td><div style="display:flex; flex-wrap:wrap; max-width: 250px;">${checkboxesHTML}</div></td>
+        <td><div style="display:flex; flex-wrap:wrap; max-width: 300px; padding: 5px 0;">${checkboxesHTML}</div></td>
         <td style="white-space: nowrap;">
           <button onclick="updateJudge('${j.id}')">Save</button>
           <button class="danger-btn" onclick="removeJudge('${j.id}')">Delete</button>
@@ -833,12 +827,12 @@
       judge.name = document.getElementById(`jName_${id}`).value;
       judge.password = newPwd;
       
-      // Collect all checked boxes seamlessly
+      // Gathers all clicked checkboxes for this specific judge instantly
       const checkedBoxes = Array.from(document.querySelectorAll(`.jForbCheck_${id}:checked`)).map(cb => cb.value);
       judge.forbiddenTownships = checkedBoxes.join(', ');
 
       pushLog(`System: Admin updated restrictions for Judge '${judge.name}'.`);
-      forceJudgeRender = true; // Tell the virtual DOM to redraw this new correct data
+      forceJudgeRender = true; // Tells the system to officially lock in the new look
       saveData();
     }
   }
@@ -928,7 +922,12 @@
   }
 
   /* OBSERVER READ-ONLY RENDERERS */
+  let lastObserverStudentHash = "";
   function renderObserverStudentList() {
+    const newHash = JSON.stringify(db.students);
+    if (lastObserverStudentHash === newHash) return;
+    lastObserverStudentHash = newHash;
+
     const tbody = document.getElementById('observerStudentList');
     if(!tbody) return;
     tbody.innerHTML = '';
@@ -938,7 +937,12 @@
     });
   }
 
+  let lastObserverJudgeHash = "";
   function renderObserverJudgeList() {
+    const newHash = JSON.stringify(db.judges);
+    if (lastObserverJudgeHash === newHash) return;
+    lastObserverJudgeHash = newHash;
+
     const tbody = document.getElementById('observerJudgeList');
     if(!tbody) return;
     tbody.innerHTML = '';
@@ -948,7 +952,7 @@
     });
   }
 
-  /* SYSTEM LOGS & MASTER HISTORY (Reusable for Admin and Observer) */
+  /* SYSTEM LOGS & MASTER HISTORY */
   function renderAdminLogs(elementId) {
     const list = document.getElementById(elementId);
     if (!list) return;
@@ -970,6 +974,10 @@
   }
 
   function renderAdminHistory(elementId) {
+    const newHash = JSON.stringify(db.scores) + JSON.stringify(db.judges);
+    if (lastAdminHistoryHash === newHash) return;
+    lastAdminHistoryHash = newHash;
+
     const tbody = document.getElementById(elementId);
     if(!tbody) return;
     tbody.innerHTML = '';
@@ -1034,6 +1042,7 @@
         if (confirm("FINAL WARNING: Click OK to factory reset the entire database. This cannot be undone.")) {
           db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin }, logs: [], presence: {} };
           pushLog("System: ALL DATA FACTORY RESET FROM PUBLIC PAGE.");
+          forceStudentRender = forceJudgeRender = forceObserverRender = true;
           saveData();
         }
       }
@@ -1068,11 +1077,17 @@
 
   /* JUDGE SCORING LOGIC */
   function populateJudgeStudents() {
+    const judge = db.judges.find(j => j.id === currentUser.id);
+    
+    // HASH LOCK for the Judge Dropdown: 100% Prevents flashing every 3 seconds!
+    const newHash = JSON.stringify(db.students) + (judge ? judge.forbiddenTownships : "");
+    if (lastJudgeStudentHash === newHash) return; 
+    lastJudgeStudentHash = newHash;
+
     const select = document.getElementById('judgeStudentSelect');
     const currentVal = select.value;
     select.innerHTML = '<option value="">-- Select Student --</option>';
     
-    const judge = db.judges.find(j => j.id === currentUser.id);
     const forbiddenList = (judge && judge.forbiddenTownships) 
       ? judge.forbiddenTownships.split(',').map(s => s.trim().toLowerCase()) 
       : [];
@@ -1127,6 +1142,10 @@
   }
 
   function renderJudgeHistory() {
+    const newHash = JSON.stringify(db.scores);
+    if (lastJudgeHistoryHash === newHash) return;
+    lastJudgeHistoryHash = newHash;
+
     const tbody = document.getElementById('judgeHistoryBody');
     tbody.innerHTML = '';
     db.students.forEach(student => {
@@ -1158,15 +1177,21 @@
   /* PUBLIC LEADERBOARD */
   function toggleRowDetails(studentId) {
     if (expandedRows.has(studentId)) expandedRows.delete(studentId); else expandedRows.add(studentId);
+    lastLeaderboardHash = ""; // Force rebuild on click
     renderLeaderboard();
   }
 
   function toggleAllDetails() {
     if (expandedRows.size > 0) expandedRows.clear(); else db.students.forEach(s => expandedRows.add(s.id));
+    lastLeaderboardHash = ""; // Force rebuild on click
     renderLeaderboard();
   }
 
   function renderLeaderboard() {
+    const newHash = JSON.stringify(db.students) + JSON.stringify(db.scores) + expandedRows.size;
+    if (lastLeaderboardHash === newHash) return;
+    lastLeaderboardHash = newHash;
+
     const tbody = document.getElementById('leaderboardBody');
     tbody.innerHTML = '';
     
@@ -1224,10 +1249,8 @@
   setInterval(fetchDb, 3000);
   fetchDb();
 
-  // 30-Second Presence Tracker & Toast Notification
+  // 30-Second Viewer Notification (Read-Only)
   setInterval(() => {
-    updatePresence();
-    
     const now = Date.now();
     let count = 0;
     let adminWatching = false;
@@ -1235,7 +1258,7 @@
     
     if (db.presence) {
         Object.values(db.presence).forEach(p => {
-            if (now - p.time < 60000) { // Considered active if seen in the last 60 seconds
+            if (now - p.time < 10800000) { // Shows anyone who logged in within the last 3 hours
                 count++;
                 if (p.name === 'U Nine Nine - Pakokku') {
                     adminWatching = true;
@@ -1246,8 +1269,8 @@
         });
     }
     
-    let msg = `👁 ${count} user(s) currently watching.`;
-    if (adminWatching) msg += ` Admin (U Nine Nine) is online.`;
+    let msg = `👁 ${count} user(s) currently active.`;
+    if (adminWatching) msg += ` Admin is online.`;
     if (observers.length > 0) {
        msg += ` Logged in: ${observers.join(', ')}.`;
     }
