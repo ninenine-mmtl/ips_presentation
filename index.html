@@ -745,6 +745,12 @@
   }
 
   function renderAdminJudgeList() {
+    // Focus Protection: Prevent overwriting inputs if the admin is currently typing inside them!
+    const active = document.activeElement;
+    if (active && active.tagName === 'INPUT' && active.id && (active.id.startsWith('jName_') || active.id.startsWith('jPass_') || active.id.startsWith('jForb_'))) {
+      return; 
+    }
+
     const tbody = document.getElementById('adminJudgeList');
     tbody.innerHTML = '';
     db.judges.forEach(j => {
@@ -995,6 +1001,10 @@
   /* JUDGE SCORING LOGIC */
   function populateJudgeStudents() {
     const select = document.getElementById('judgeStudentSelect');
+    
+    // Focus Protection for the dropdown menu!
+    if (document.activeElement === select) return; 
+
     const currentVal = select.value;
     select.innerHTML = '<option value="">-- Select Student --</option>';
     
