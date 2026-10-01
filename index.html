@@ -248,17 +248,20 @@
       </div>
     </div>
 
-    <!-- Student Management & Backup -->
+    <!-- Student Management & Backup with Collapse Button -->
     <div class="card">
       <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">Manage Students</h3>
+        <h3 style="border:none; margin:0; font-size: 1.3rem; display: flex; align-items: center; gap: 10px;">
+          Manage Students
+          <button id="toggleStudentListBtn" onclick="toggleAdminStudentList()" style="background: rgba(255, 193, 7, 0.1); border: 1px solid #FFC107; color: #FFC107; padding: 2px 10px; font-size: 0.9rem;">▼</button>
+        </h3>
         <div style="display: flex; gap: 10px;">
           <button onclick="exportStudents()">⬇️ Backup Students</button>
           <button onclick="document.getElementById('studentFileInput').click()">⬆️ Import Students</button>
           <input type="file" id="studentFileInput" accept=".json" style="display: none;" onchange="importStudents(event)">
         </div>
       </div>
-      <div class="table-responsive">
+      <div class="table-responsive" id="adminStudentTableContainer">
         <table>
           <thead><tr><th>Name</th><th>Township</th><th>Action</th></tr></thead>
           <tbody id="adminStudentList"></tbody>
@@ -410,6 +413,32 @@
       <button class="nav-btn" onclick="showView('publicView')" style="margin-top: 10px;">Return to Public Leaderboard</button>
     </div>
 
+    <!-- Read-Only Students List -->
+    <div class="card">
+      <div class="card-header-flex">
+        <h3 style="border:none; margin:0; font-size: 1.3rem;">Registered Students</h3>
+      </div>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Name</th><th>Township</th></tr></thead>
+          <tbody id="observerStudentList"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Read-Only Judges List -->
+    <div class="card">
+      <div class="card-header-flex">
+        <h3 style="border:none; margin:0; font-size: 1.3rem;">Registered Judges</h3>
+      </div>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Name</th><th>Forbidden Townships</th></tr></thead>
+          <tbody id="observerJudgeList"></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Live Logs -->
     <div class="card">
       <div class="card-header-flex">
@@ -525,7 +554,6 @@
     const id = currentUser ? (currentUser.role === 'admin' ? 'admin' : currentUser.id) : 'public_' + window.localSessionId;
     const name = currentUser ? (currentUser.role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name) : 'Public Viewer';
     
-    // Removed password from presence payload
     db.presence[id] = { name: name, time: Date.now() };
     saveData(true); // Silent save for presence
   }
@@ -547,6 +575,8 @@
       updateJudgeFormState();
     }
     if (currentUser?.role === 'observer') {
+      renderObserverStudentList();
+      renderObserverJudgeList();
       renderAdminLogs('observerLogsList');
       renderAdminHistory('observerVotingHistory');
     }
@@ -644,6 +674,18 @@
       delete db.scores[id];
       pushLog(`System: Admin deleted student '${student.name}'.`);
       saveData();
+    }
+  }
+
+  function toggleAdminStudentList() {
+    const container = document.getElementById('adminStudentTableContainer');
+    const btn = document.getElementById('toggleStudentListBtn');
+    if (container.style.display === 'none') {
+      container.style.display = 'block';
+      btn.innerText = '▼';
+    } else {
+      container.style.display = 'none';
+      btn.innerText = '▶';
     }
   }
 
@@ -807,6 +849,27 @@
       pushLog(`System: Admin deleted Observer '${observer.name}'.`);
       saveData();
     }
+  }
+
+  /* OBSERVER READ-ONLY RENDERERS */
+  function renderObserverStudentList() {
+    const tbody = document.getElementById('observerStudentList');
+    if(!tbody) return;
+    tbody.innerHTML = '';
+    if (db.students.length === 0) return tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">No students yet.</td></tr>';
+    db.students.forEach(s => {
+      tbody.innerHTML += `<tr><td>${s.name}</td><td>${s.township}</td></tr>`;
+    });
+  }
+
+  function renderObserverJudgeList() {
+    const tbody = document.getElementById('observerJudgeList');
+    if(!tbody) return;
+    tbody.innerHTML = '';
+    if (db.judges.length === 0) return tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">No judges yet.</td></tr>';
+    db.judges.forEach(j => {
+      tbody.innerHTML += `<tr><td>${j.name}</td><td>${j.forbiddenTownships || 'None'}</td></tr>`;
+    });
   }
 
   /* SYSTEM LOGS & MASTER HISTORY (Reusable for Admin and Observer) */
