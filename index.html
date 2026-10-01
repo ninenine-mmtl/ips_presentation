@@ -1,0 +1,635 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>IPS Essay Live Scoring - CLOUD EDITION</title>
+
+<!-- FIREBASE SCRIPTS -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
+<style>
+  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f2027; color: white; margin: 0; padding: 0; }
+  .container { max-width: 1200px; margin: 20px auto; padding: 20px; }
+  
+  header { background: #203a43; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #f39c12; }
+  h1 { margin: 0; font-size: 1.8rem; color: #f39c12; }
+  
+  button { background: #f39c12; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.9rem; transition: 0.2s; }
+  button:hover { background: #f1c40f; }
+  button:disabled { background: #7f8c8d; cursor: not-allowed; }
+  .danger-btn { background: #e74c3c; }
+  .danger-btn:hover { background: #c0392b; }
+  .action-btn { background: #3498db; }
+  .action-btn:hover { background: #2980b9; }
+  .success-btn { background: #2ecc71; }
+  
+  input, select { padding: 10px; margin: 5px 0 10px 0; border-radius: 5px; border: 1px solid #555; background: #222; color: white; width: 100%; box-sizing: border-box; }
+  .table-input { padding: 8px; margin: 0; font-size: 0.9rem; }
+  
+  .view-section { display: none; animation: fadeIn 0.3s; }
+  .active-view { display: block; }
+  
+  .card { background: rgba(255,255,255,0.05); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid rgba(255,255,255,0.1); position: relative; }
+  h2, h3 { margin-top: 0; border-bottom: 1px solid #555; padding-bottom: 10px; color: #00d2ff; }
+  
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; background: rgba(0,0,0,0.2); border-radius: 8px; overflow: hidden; font-size: 1rem; }
+  th, td { padding: 15px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.1); }
+  th { background: rgba(0,0,0,0.5); color: #f39c12; }
+  
+  .student-row { cursor: pointer; transition: background 0.2s; }
+  .student-row:hover { background: rgba(255,255,255,0.1) !important; }
+  
+  .rank-1 { color: #f1c40f; font-weight: bold; }
+  .rank-2 { color: #bdc3c7; font-weight: bold; }
+  .rank-3 { color: #cd7f32; font-weight: bold; }
+
+  .details-container { padding: 0 !important; border-bottom: 2px solid #f39c12 !important; }
+  .details-table { width: 100%; font-size: 0.9rem; background: rgba(0, 210, 255, 0.05); border-radius: 0; margin: 0; }
+  .details-table th { background: rgba(0, 210, 255, 0.15); color: #00d2ff; padding: 10px; text-transform: uppercase; font-size: 0.8rem; }
+  .details-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+  .scoring-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+  .score-item label { display: block; font-weight: bold; margin-bottom: 5px; color: #ccc; font-size: 0.85rem;}
+  
+  .status-badge { padding: 5px 10px; border-radius: 20px; font-weight: bold; margin-left: 10px; font-size: 0.9rem; transition: background 0.3s;}
+  .open { background: #2ecc71; color: #000; }
+  .closed { background: #e74c3c; color: #fff; }
+
+  .log-list { list-style-type: none; padding: 0; margin: 0; font-family: monospace; font-size: 0.9rem; color: #ccc; }
+  .log-list li { padding: 8px 0; border-bottom: 1px dashed rgba(255,255,255,0.1); animation: highlightNew 1s ease; }
+  .log-timestamp { color: #f39c12; margin-right: 10px; }
+  
+  #connectionStatus { font-size: 0.8rem; margin-left: 15px; color: #2ecc71; }
+
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes highlightNew { 0% { background: rgba(46, 204, 113, 0.3); } 100% { background: transparent; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div style="display: flex; align-items: center;">
+    <h1>IPS Essay Competition</h1>
+    <span id="globalVotingStatus" class="status-badge"></span>
+    <span id="connectionStatus">● Connected Live</span>
+  </div>
+  <div id="authButtons">
+    <button onclick="showLogin()">Login (Admin / Judge)</button>
+  </div>
+  <div id="userMenu" style="display:none;">
+    <span id="welcomeMsg" style="margin-right: 15px; font-weight: bold;"></span>
+    <button onclick="logout()" class="danger-btn">Logout</button>
+  </div>
+</header>
+
+<div class="container">
+  
+  <!-- PUBLIC LEADERBOARD -->
+  <div id="publicView" class="view-section active-view">
+    <div class="card">
+      <button class="action-btn" onclick="toggleAllDetails()" style="position: absolute; right: 20px; top: 15px;">👁 Toggle All Details</button>
+      <h2 style="text-align: center; font-size: 2rem;">🏆 Live Leaderboard</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Rank</th><th>Student Name</th><th>Township</th><th>Avg Total (out of 25)</th>
+          </tr>
+        </thead>
+        <tbody id="leaderboardBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div id="loginView" class="view-section">
+    <div class="card" style="max-width: 400px; margin: 0 auto;">
+      <h2>System Login</h2>
+      <label>Password / PIN:</label>
+      <input type="password" id="loginPassword" placeholder="Enter Admin or Judge PIN" inputmode="numeric">
+      <button onclick="handleLogin()" style="width: 100%;">Login</button>
+      <button onclick="showView('publicView')" style="width: 100%; margin-top: 10px; background: #555;">Back to Leaderboard</button>
+    </div>
+  </div>
+
+  <!-- ADMIN VIEW -->
+  <div id="adminView" class="view-section">
+    <div class="card" style="display: flex; justify-content: space-between; align-items: center; background: rgba(0,210,255,0.1);">
+      <div>
+        <h3 style="border:none; margin:0; padding:0;">Voting Controls</h3>
+        <p style="margin:5px 0 0 0; font-size:0.9rem; color:#ccc;">Turn voting on or off for all judges. Audience status updates instantly.</p>
+      </div>
+      <button id="toggleVotingBtn" onclick="toggleVoting()" style="font-size: 1.2rem; padding: 15px 30px;"></button>
+    </div>
+
+    <!-- Admin Logs -->
+    <div class="card" style="border-color: #f39c12;">
+      <h3>Real-Time System Logs</h3>
+      <button class="action-btn" onclick="exportLogs()" style="margin-bottom: 15px;">⬇️ Download Logs (.txt)</button>
+      <div style="max-height: 250px; overflow-y: auto; background: rgba(0,0,0,0.4); padding: 15px; border-radius: 8px;">
+        <ul id="adminLogsList" class="log-list"></ul>
+      </div>
+    </div>
+
+    <div style="display: flex; gap: 20px; margin-bottom: 20px;">
+      <div class="card" style="flex: 1;">
+        <h3>Add Student</h3>
+        <input type="text" id="studentName" placeholder="Student Name">
+        <input type="text" id="studentTownship" placeholder="Township / Branch">
+        <button onclick="addStudent()">Add Student</button>
+      </div>
+      <div class="card" style="flex: 1;">
+        <h3>Create Judge</h3>
+        <input type="text" id="judgeName" placeholder="Judge Name">
+        <input type="password" id="judgePassword" maxlength="4" placeholder="Set 4-Digit PIN" inputmode="numeric">
+        <button onclick="addJudge()">Create Judge</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Manage Students</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Name</th><th>Township</th><th>Action</th></tr></thead>
+          <tbody id="adminStudentList"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Manage Judges & Restrictions</h3>
+      <p style="font-size:0.9rem; color:#aaa;">PINs must be exactly 4 digits. To forbid a judge from voting for a branch, type the township name.</p>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr><th>Name</th><th>PIN (4-Digits)</th><th>Forbidden Townships (comma-separated)</th><th>Actions</th></tr></thead>
+          <tbody id="adminJudgeList"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>System Actions</h3>
+      <button class="danger-btn" onclick="clearAllData()" style="width: 100%; font-size: 1.2rem; padding: 15px;">⚠️ Reset Entire Database</button>
+    </div>
+  </div>
+
+  <!-- JUDGE VIEW -->
+  <div id="judgeView" class="view-section">
+    <div class="card">
+      <h2>📝 Submit / Edit Score</h2>
+      <p id="judgeWarning" style="color: #e74c3c; font-weight: bold; display: none;">Voting is currently CLOSED by the Admin.</p>
+      
+      <label>Select Student:</label>
+      <select id="judgeStudentSelect"></select>
+      
+      <div class="scoring-grid" style="margin-top: 15px;">
+        <div class="score-item"><label>Pronunciation (5)</label><input type="number" id="s_pron" min="0" max="5" value="0"></div>
+        <div class="score-item"><label>Grammar (3)</label><input type="number" id="s_gram" min="0" max="3" value="0"></div>
+        <div class="score-item"><label>Fluency (4)</label><input type="number" id="s_flu" min="0" max="4" value="0"></div>
+        <div class="score-item"><label>Q & A (6)</label><input type="number" id="s_qa" min="0" max="6" value="0"></div>
+        <div class="score-item"><label>Content (3)</label><input type="number" id="s_cont" min="0" max="3" value="0"></div>
+        <div class="score-item"><label>Delivery (4)</label><input type="number" id="s_deliv" min="0" max="4" value="0"></div>
+      </div>
+      
+      <button id="submitScoreBtn" onclick="submitScore()" style="width: 100%; margin-top: 15px; font-size: 1.2rem; padding: 15px;">Submit Score</button>
+    </div>
+
+    <div class="card">
+      <h3>My Voting History</h3>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr><th>Student</th><th>Total Score</th><th>Details</th><th>Action</th></tr>
+          </thead>
+          <tbody id="judgeHistoryBody"></tbody>
+        </table>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h3>Security Setting</h3>
+      <label>Change Your PIN (4 Digits Only):</label>
+      <div style="display: flex; gap: 10px; margin-top: 5px;">
+        <input type="password" id="judgeNewPin" maxlength="4" placeholder="E.g. 1234" style="flex: 1; max-width: 300px;" inputmode="numeric">
+        <button class="action-btn" onclick="updateJudgePin()" style="white-space: nowrap;">Update PIN</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  // ==========================================
+  // 🔴 PASTE YOUR FIREBASE CONFIG HERE 🔴
+  // ==========================================
+  // Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyB7xsqPMM7HyQlcwteGZZVJJp_3Wt0KVCM",
+  authDomain: "ips-scoring.firebaseapp.com",
+  databaseURL: "https://ips-scoring-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ips-scoring",
+  storageBucket: "ips-scoring.firebasestorage.app",
+  messagingSenderId: "469846491683",
+  appId: "1:469846491683:web:57774a87b57d7c6f01e796",
+  measurementId: "G-K616TBV93C"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+  // ==========================================
+
+  // Initialize Firebase
+  firebase.initializeApp(firebaseConfig);
+  const database = firebase.database();
+  const dbRef = database.ref('ips_scoring_db');
+
+  // Master Database Object
+  let db = { students: [], judges: [], scores: {}, settings: { votingOpen: true }, logs: [] };
+  let currentUser = null; 
+  let expandedRows = new Set(); 
+  const genId = () => Math.random().toString(36).substr(2, 9);
+  
+  // Real-Time Listener (Runs automatically when ANYONE makes a change!)
+  dbRef.on('value', (snapshot) => {
+    const data = snapshot.val();
+    if (data) {
+      // Ensure arrays/objects exist even if Firebase removes empty ones
+      db = {
+        students: data.students || [],
+        judges: data.judges || [],
+        scores: data.scores || {},
+        settings: data.settings || { votingOpen: true },
+        logs: data.logs || []
+      };
+    } else {
+      // First time loading ever
+      db = { students: [], judges: [], scores: {}, settings: { votingOpen: true }, logs: [] };
+    }
+    updateUI();
+  });
+
+  // Push updates to Firebase
+  function saveData() {
+    dbRef.set(db).catch(error => alert("Error saving data: " + error.message));
+  }
+
+  function pushLog(msg) {
+    const timestamp = new Date().toLocaleTimeString();
+    db.logs.push({ time: timestamp, message: msg });
+  }
+
+  function updateUI() {
+    renderLeaderboard();
+    updateHeaderStatus();
+    if (currentUser?.role === 'admin') {
+      renderAdminStudentList();
+      renderAdminJudgeList();
+      updateAdminToggleBtn();
+      renderAdminLogs();
+    }
+    if (currentUser?.role === 'judge') {
+      populateJudgeStudents();
+      renderJudgeHistory();
+      updateJudgeFormState();
+    }
+  }
+
+  function showView(viewId) {
+    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
+    document.getElementById(viewId).classList.add('active-view');
+    updateUI();
+  }
+
+  function showLogin() { showView('loginView'); document.getElementById('loginPassword').value = ''; }
+
+  function handleLogin() {
+    const pwd = document.getElementById('loginPassword').value;
+    if (pwd === '1123') {
+      currentUser = { role: 'admin', name: 'Admin' };
+      document.getElementById('authButtons').style.display = 'none';
+      document.getElementById('userMenu').style.display = 'block';
+      document.getElementById('welcomeMsg').innerText = `Admin Access`;
+      pushLog(`Access: Admin logged in.`);
+      saveData();
+      showView('adminView');
+    } else {
+      const judge = db.judges.find(j => j.password === pwd);
+      if (judge) {
+        currentUser = { role: 'judge', id: judge.id, name: judge.name };
+        document.getElementById('authButtons').style.display = 'none';
+        document.getElementById('userMenu').style.display = 'block';
+        document.getElementById('welcomeMsg').innerText = `Judge: ${judge.name}`;
+        pushLog(`Access: Judge '${judge.name}' logged in.`);
+        saveData();
+        showView('judgeView');
+      } else {
+        alert("Incorrect PIN!");
+      }
+    }
+  }
+
+  function logout() { currentUser = null; document.getElementById('authButtons').style.display = 'block'; document.getElementById('userMenu').style.display = 'none'; showView('publicView'); }
+
+  function updateHeaderStatus() {
+    const badge = document.getElementById('globalVotingStatus');
+    if (db.settings.votingOpen) { badge.innerText = "Voting: OPEN"; badge.className = "status-badge open"; } 
+    else { badge.innerText = "Voting: CLOSED"; badge.className = "status-badge closed"; }
+  }
+
+  function toggleVoting() { 
+    db.settings.votingOpen = !db.settings.votingOpen; 
+    const statusText = db.settings.votingOpen ? 'OPENED' : 'CLOSED';
+    pushLog(`Status: Admin ${statusText} system voting.`);
+    saveData(); 
+  }
+  
+  function updateAdminToggleBtn() {
+    const btn = document.getElementById('toggleVotingBtn');
+    if (db.settings.votingOpen) { btn.innerText = "Close Voting"; btn.className = "danger-btn"; } 
+    else { btn.innerText = "Open Voting"; btn.className = "success-btn"; }
+  }
+
+  function addStudent() {
+    const name = document.getElementById('studentName').value;
+    const twp = document.getElementById('studentTownship').value;
+    if (!name || !twp) return;
+    db.students.push({ id: genId(), name, township: twp });
+    pushLog(`System: Admin added student '${name}'.`);
+    saveData();
+    document.getElementById('studentName').value = ''; document.getElementById('studentTownship').value = '';
+  }
+
+  function removeStudent(id) {
+    const student = db.students.find(s => s.id === id);
+    if (student && confirm("Remove this student and all their scores?")) {
+      db.students = db.students.filter(s => s.id !== id);
+      delete db.scores[id];
+      pushLog(`System: Admin deleted student '${student.name}'.`);
+      saveData();
+    }
+  }
+
+  function renderAdminStudentList() {
+    const tbody = document.getElementById('adminStudentList');
+    tbody.innerHTML = '';
+    db.students.forEach(s => {
+      tbody.innerHTML += `<tr><td>${s.name}</td><td>${s.township}</td><td><button class="danger-btn" onclick="removeStudent('${s.id}')">Delete</button></td></tr>`;
+    });
+  }
+
+  function addJudge() {
+    const name = document.getElementById('judgeName').value;
+    const pwd = document.getElementById('judgePassword').value;
+    if (!name || !pwd) return;
+    if (!/^\d{4}$/.test(pwd)) return alert("PIN must be exactly 4 digits (0-9).");
+    if (pwd === '1123') return alert("Cannot use the Admin PIN.");
+    
+    db.judges.push({ id: genId(), name, password: pwd, forbiddenTownships: "" });
+    pushLog(`System: Admin created Judge '${name}'.`);
+    saveData();
+    document.getElementById('judgeName').value = ''; document.getElementById('judgePassword').value = '';
+    alert(`Judge ${name} created!`);
+  }
+
+  function renderAdminJudgeList() {
+    const tbody = document.getElementById('adminJudgeList');
+    tbody.innerHTML = '';
+    db.judges.forEach(j => {
+      tbody.innerHTML += `<tr>
+        <td><input type="text" id="jName_${j.id}" class="table-input" value="${j.name}"></td>
+        <td><input type="password" id="jPass_${j.id}" class="table-input" value="${j.password}" maxlength="4"></td>
+        <td><input type="text" id="jForb_${j.id}" class="table-input" value="${j.forbiddenTownships || ''}" placeholder="E.g. Pakokku, Myaing"></td>
+        <td style="white-space: nowrap;">
+          <button class="action-btn" onclick="updateJudge('${j.id}')">Save</button>
+          <button class="danger-btn" onclick="removeJudge('${j.id}')">Delete</button>
+        </td>
+      </tr>`;
+    });
+  }
+
+  function updateJudge(id) {
+    const judge = db.judges.find(j => j.id === id);
+    if(judge) {
+      const newPwd = document.getElementById(`jPass_${id}`).value;
+      if (!/^\d{4}$/.test(newPwd)) return alert("PIN must be exactly 4 digits.");
+      judge.name = document.getElementById(`jName_${id}`).value;
+      judge.password = newPwd;
+      judge.forbiddenTownships = document.getElementById(`jForb_${id}`).value;
+      pushLog(`System: Admin updated restrictions/settings for Judge '${judge.name}'.`);
+      saveData();
+      alert("Judge details and restrictions updated!");
+    }
+  }
+
+  function removeJudge(id) {
+    const judge = db.judges.find(j => j.id === id);
+    if(judge && confirm("Delete this judge account? Their previously submitted scores will remain.")) {
+      db.judges = db.judges.filter(j => j.id !== id);
+      pushLog(`System: Admin deleted Judge '${judge.name}'.`);
+      saveData();
+    }
+  }
+
+  function renderAdminLogs() {
+    const list = document.getElementById('adminLogsList');
+    list.innerHTML = '';
+    if (db.logs.length === 0) return list.innerHTML = '<li>No system events logged yet.</li>';
+    [...db.logs].reverse().forEach(log => {
+      list.innerHTML += `<li><span class="log-timestamp">[${log.time}]</span> ${log.message}</li>`;
+    });
+  }
+  
+  function exportLogs() {
+    if (db.logs.length === 0) return alert("No logs to download.");
+    const logStrings = db.logs.map(l => `[${l.time}] ${l.message}`);
+    const dataStr = "data:text/plain;charset=utf-8," + encodeURIComponent(logStrings.join('\n'));
+    const dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("download", `IPS_System_Logs.txt`);
+    dlAnchorElem.click();
+  }
+
+  function clearAllData() {
+    if (confirm("WARNING: Deletes all data globally from the cloud! Are you sure?")) {
+      db = { students: [], judges: [], scores: {}, settings: { votingOpen: true }, logs: [] };
+      pushLog("System: ALL DATA RESET BY ADMIN.");
+      saveData();
+    }
+  }
+
+  function updateJudgePin() {
+    const newPin = document.getElementById('judgeNewPin').value;
+    if (!/^\d{4}$/.test(newPin)) return alert("PIN must be exactly 4 digits (0-9).");
+    if (newPin === '1123') return alert("Cannot use the Admin PIN.");
+    const judge = db.judges.find(j => j.id === currentUser.id);
+    if (judge) {
+      judge.password = newPin;
+      pushLog(`Security: Judge '${judge.name}' changed their PIN.`);
+      saveData();
+      document.getElementById('judgeNewPin').value = '';
+      alert("Your PIN has been updated!");
+    }
+  }
+
+  function populateJudgeStudents() {
+    const select = document.getElementById('judgeStudentSelect');
+    const currentVal = select.value;
+    select.innerHTML = '<option value="">-- Select Student --</option>';
+    
+    const judge = db.judges.find(j => j.id === currentUser.id);
+    const forbiddenList = (judge && judge.forbiddenTownships) 
+      ? judge.forbiddenTownships.split(',').map(s => s.trim().toLowerCase()) 
+      : [];
+
+    db.students.forEach(s => {
+      const studentTownship = s.township.trim().toLowerCase();
+      if (forbiddenList.includes(studentTownship)) {
+        select.innerHTML += `<option value="${s.id}" disabled>🚫 ${s.name} (${s.township}) - RESTRICTED</option>`;
+      } else {
+        select.innerHTML += `<option value="${s.id}">${s.name} (${s.township})</option>`;
+      }
+    });
+    select.value = currentVal;
+  }
+
+  function updateJudgeFormState() {
+    const btn = document.getElementById('submitScoreBtn');
+    const warning = document.getElementById('judgeWarning');
+    if (db.settings.votingOpen) { btn.disabled = false; btn.innerText = "Submit Score"; warning.style.display = 'none'; } 
+    else { btn.disabled = true; btn.innerText = "Voting Closed"; warning.style.display = 'block'; }
+  }
+
+  function submitScore() {
+    if (!db.settings.votingOpen) return alert("Voting is closed!");
+    const studentId = document.getElementById('judgeStudentSelect').value;
+    if (!studentId) return alert("Select a student");
+
+    const student = db.students.find(s => s.id === studentId);
+    const judge = db.judges.find(j => j.id === currentUser.id);
+    const forbiddenList = (judge && judge.forbiddenTownships) ? judge.forbiddenTownships.split(',').map(s => s.trim().toLowerCase()) : [];
+    if (student && forbiddenList.includes(student.township.trim().toLowerCase())) return alert("Restricted from this township.");
+
+    const pron = Math.min(5, Number(document.getElementById('s_pron').value));
+    const gram = Math.min(3, Number(document.getElementById('s_gram').value));
+    const flu = Math.min(4, Number(document.getElementById('s_flu').value));
+    const qa = Math.min(6, Number(document.getElementById('s_qa').value));
+    const cont = Math.min(3, Number(document.getElementById('s_cont').value));
+    const deliv = Math.min(4, Number(document.getElementById('s_deliv').value));
+    const total = pron + gram + flu + qa + cont + deliv;
+
+    const isEdit = !!(db.scores[studentId] && db.scores[studentId][currentUser.id]);
+    const actionText = isEdit ? "updated score" : "submitted new score";
+
+    if (!db.scores[studentId]) db.scores[studentId] = {};
+    db.scores[studentId][currentUser.id] = { pron, gram, flu, qa, cont, deliv, total };
+    
+    pushLog(`Scoring: Judge '${judge.name}' ${actionText} for student '${student.name}' (${total}/25).`);
+    saveData();
+    alert(`Score of ${total}/25 submitted!`);
+    ['pron','gram','flu','qa','cont','deliv'].forEach(id => document.getElementById(`s_${id}`).value = 0);
+    document.getElementById('judgeStudentSelect').value = '';
+  }
+
+  function renderJudgeHistory() {
+    const tbody = document.getElementById('judgeHistoryBody');
+    tbody.innerHTML = '';
+    db.students.forEach(student => {
+      const s = db.scores[student.id]?.[currentUser.id];
+      if (s) {
+        tbody.innerHTML += `<tr>
+          <td>${student.name}</td>
+          <td style="font-weight:bold; color:#f39c12;">${s.total} / 25</td>
+          <td style="font-size:0.8rem; color:#aaa;">P:${s.pron} G:${s.gram} F:${s.flu} Q:${s.qa} C:${s.cont} D:${s.deliv}</td>
+          <td><button class="action-btn" onclick="editMyScore('${student.id}')" ${!db.settings.votingOpen ? 'disabled' : ''}>Edit</button></td>
+        </tr>`;
+      }
+    });
+  }
+
+  function editMyScore(studentId) {
+    if (!db.settings.votingOpen) return alert("Voting is closed!");
+    const s = db.scores[studentId][currentUser.id];
+    document.getElementById('judgeStudentSelect').value = studentId;
+    document.getElementById('s_pron').value = s.pron;
+    document.getElementById('s_gram').value = s.gram;
+    document.getElementById('s_flu').value = s.flu;
+    document.getElementById('s_qa').value = s.qa;
+    document.getElementById('s_cont').value = s.cont;
+    document.getElementById('s_deliv').value = s.deliv;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function toggleRowDetails(studentId) {
+    if (expandedRows.has(studentId)) expandedRows.delete(studentId); else expandedRows.add(studentId);
+    renderLeaderboard();
+  }
+
+  function toggleAllDetails() {
+    if (expandedRows.size > 0) expandedRows.clear(); else db.students.forEach(s => expandedRows.add(s.id));
+    renderLeaderboard();
+  }
+
+  function renderLeaderboard() {
+    const tbody = document.getElementById('leaderboardBody');
+    tbody.innerHTML = '';
+    
+    if (db.students.length === 0) return tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No students yet.</td></tr>';
+
+    let results = db.students.map(student => {
+      let scoresObj = db.scores[student.id];
+      let avgScore = 0;
+      let judgeCount = scoresObj ? Object.keys(scoresObj).length : 0;
+      if (judgeCount > 0) {
+        let totalPoints = Object.values(scoresObj).reduce((sum, s) => sum + s.total, 0);
+        avgScore = totalPoints / judgeCount;
+      }
+      return { ...student, score: avgScore, judges: judgeCount, scoresObj };
+    }).sort((a, b) => b.score - a.score);
+
+    results.forEach((r, index) => {
+      let rClass = (index === 0 && r.score > 0) ? 'rank-1' : (index === 1 && r.score > 0) ? 'rank-2' : (index === 2 && r.score > 0) ? 'rank-3' : '';
+      let isExpanded = expandedRows.has(r.id);
+      
+      tbody.innerHTML += `<tr class="student-row ${rClass}" onclick="toggleRowDetails('${r.id}')" style="background: rgba(255,255,255,0.02);">
+        <td>#${index + 1}</td>
+        <td>${r.name} <span style="font-size:0.75rem; color:#00d2ff; margin-left:10px;">${isExpanded ? '▼ Hide details' : '▶ Show details'}</span></td>
+        <td>${r.township}</td>
+        <td>${r.score.toFixed(2)} <span style="font-size:0.8rem;color:#aaa;">(${r.judges} votes)</span></td>
+      </tr>`;
+
+      if (isExpanded) {
+        let detailsHTML = `<tr><td colspan="4" class="details-container">
+          <table class="details-table">
+            <thead><tr><th>Judge</th><th>Pron (5)</th><th>Gram (3)</th><th>Flu (4)</th><th>Q&A (6)</th><th>Cont (3)</th><th>Deliv (4)</th><th>Total (25)</th></tr></thead>
+            <tbody>`;
+        
+        if (r.scoresObj && Object.keys(r.scoresObj).length > 0) {
+          Object.keys(r.scoresObj).forEach(judgeId => {
+            const judge = db.judges.find(j => j.id === judgeId);
+            const jName = judge ? judge.name : 'Unknown';
+            const s = r.scoresObj[judgeId];
+            detailsHTML += `<tr>
+              <td style="font-weight:bold; color:#f39c12;">${jName}</td>
+              <td>${s.pron}</td><td>${s.gram}</td><td>${s.flu}</td><td>${s.qa}</td><td>${s.cont}</td><td>${s.deliv}</td>
+              <td style="font-weight:bold; color:#2ecc71;">${s.total}</td>
+            </tr>`;
+          });
+        } else {
+          detailsHTML += `<tr><td colspan="8" style="text-align:center; color:#aaa;">No scores submitted yet.</td></tr>`;
+        }
+        detailsHTML += `</tbody></table></td></tr>`;
+        tbody.innerHTML += detailsHTML;
+      }
+    });
+  }
+</script>
+</body>
+</html>
