@@ -109,11 +109,12 @@
   .log-list li { padding: 8px 0; border-bottom: 1px dashed #233554; }
   .log-timestamp { color: #FFC107; margin-right: 10px; }
 
-  /* Slide-in Toast Notifications */
+  /* Slide-in Toast Notifications - Slowed Down Animation */
   #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
-  .toast { background: rgba(17, 34, 64, 0.95); border-left: 4px solid #FFC107; color: white; padding: 15px 20px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 0.9rem; animation: slideIn 0.5s forwards, fadeOut 0.5s 4.5s forwards; pointer-events: auto; }
-  @keyframes slideIn { from { transform: translateX(120%); } to { transform: translateX(0); } }
-  @keyframes fadeOut { from { transform: translateX(0); } to { transform: translateX(120%); } }
+  .toast { background: rgba(17, 34, 64, 0.95); border-left: 4px solid #FFC107; color: white; padding: 15px 20px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 0.9rem; 
+           animation: slideIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards, fadeOut 0.8s 5s ease-in forwards; pointer-events: auto; }
+  @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+  @keyframes fadeOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
 
   /* Desktop Adjustments */
   @media(min-width: 768px) {
@@ -279,10 +280,10 @@
           <input type="file" id="judgeFileInput" accept=".json" style="display: none;" onchange="importJudges(event)">
         </div>
       </div>
-      <p style="font-size:0.9rem; color:#ccc;">To forbid a judge from voting for a branch, type the township name.</p>
+      <p style="font-size:0.9rem; color:#ccc;">Check the boxes to forbid a judge from voting for specific branches.</p>
       <div class="table-responsive">
         <table>
-          <thead><tr><th>Name</th><th>PIN (4-Digits)</th><th>Forbidden Townships (comma-separated)</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>PIN (4-Digits)</th><th>Forbidden Townships (Auto-Generated)</th><th>Actions</th></tr></thead>
           <tbody id="adminJudgeList"></tbody>
         </table>
       </div>
@@ -481,21 +482,14 @@
   const genId = () => Math.random().toString(36).substr(2, 9);
   let parseDocId = null;
 
-  // SMART SYNC LOCK - Prevents background refresh from wiping out data while you are typing!
-  window.isEditing = false;
+  // HASH RENDERING LOCKS - Prevents the screen from overwriting your typing!
+  let lastStudentHash = "";
+  let lastJudgeHash = "";
+  let lastObserverHash = "";
+  let forceStudentRender = true;
+  let forceJudgeRender = true;
+  let forceObserverRender = true;
   window.isSaving = false;
-
-  document.addEventListener('focusin', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
-      window.isEditing = true;
-    }
-  });
-
-  document.addEventListener('focusout', (e) => {
-    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
-      setTimeout(() => { window.isEditing = false; }, 800); // 800ms buffer before allowing sync to overwrite
-    }
-  });
 
   // Toast Notification Logic
   function createToastContainer() {
@@ -514,20 +508,17 @@
     toast.className = 'toast';
     toast.innerText = message;
     container.appendChild(toast);
-    setTimeout(() => toast.remove(), 4900);
+    setTimeout(() => toast.remove(), 5800);
   }
 
   async function fetchDb() {
-    // If the Admin is typing or saving data, completely abort the background pull!
-    if (window.isEditing || window.isSaving) return; 
+    if (window.isSaving) return; // Prevent overwriting during manual saves
 
     const AppData = Parse.Object.extend("AppData");
     const query = new Parse.Query(AppData);
     try {
       const results = await query.find();
-      
-      // Double check lock in case they clicked an input during network transit time
-      if (window.isEditing || window.isSaving) return; 
+      if (window.isSaving) return; 
 
       if (results.length > 0) {
         parseDocId = results[0].id;
@@ -558,7 +549,7 @@
   }
 
   async function saveData(silent = false) { 
-    window.isSaving = true; // Lock sync globally
+    window.isSaving = true; 
     if (!parseDocId) {
         await fetchDb();
     }
@@ -570,27 +561,35 @@
     
     try {
         await obj.save();
-        setTimeout(() => { window.isSaving = false; }, 1000); // Release lock 1 sec after save completes
+        setTimeout(() => { window.isSaving = false; }, 500);
         if (!silent) showToast("Changes saved successfully!");
     } catch (error) {
-        window.isSaving = false; // Release lock on error
+        window.isSaving = false;
         if (!silent) showToast("Error saving data: " + error.message); 
     }
   }
   
   function pushLog(msg) { db.logs.push({ time: new Date().toLocaleTimeString(), message: msg }); }
 
-  function updatePresence() {
-    // Only logged in users log their presence to prevent unneeded database writes
-    if (!currentUser) return; 
-    if (!parseDocId) return;
-    if (window.isEditing || window.isSaving) return; // Don't interrupt important work
+  // Isolated Presence Update
+  async function updatePresence() {
+    if (!currentUser || !parseDocId || window.isSaving) return; 
     
     const id = (currentUser.role === 'admin' ? 'admin' : currentUser.id);
     const name = (currentUser.role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name);
     
-    db.presence[id] = { name: name, time: Date.now() };
-    saveData(true); // Silent background save
+    const AppData = Parse.Object.extend("AppData");
+    const query = new Parse.Query(AppData);
+    try {
+        const results = await query.find();
+        if (results.length > 0) {
+            const serverData = results[0].get("payload");
+            if (!serverData.presence) serverData.presence = {};
+            serverData.presence[id] = { name: name, time: Date.now() };
+            results[0].set("payload", serverData);
+            await results[0].save();
+        }
+    } catch (e) {}
   }
 
   function updateUI() {
@@ -602,7 +601,7 @@
       renderAdminObserverList();
       updateAdminToggleBtn();
       renderAdminLogs('adminLogsList');
-      renderAdminHistory('adminVotingHistory');
+      renderAdminHistory('adminVotingHistory'); // Scores live update instantly
     }
     if (currentUser?.role === 'judge') {
       populateJudgeStudents();
@@ -636,6 +635,7 @@
       document.getElementById('welcomeMsg').innerText = `Admin Access`;
       pushLog(`Access: Admin (U Nine Nine) logged in.`);
       showToast(`Welcome back, U Nine Nine.`);
+      forceStudentRender = forceJudgeRender = forceObserverRender = true;
       updatePresence();
       showView('adminView');
     } else {
@@ -698,6 +698,7 @@
     if (!name || !twp) return;
     db.students.push({ id: genId(), name, township: twp });
     pushLog(`System: Admin added student '${name}'.`);
+    forceStudentRender = forceJudgeRender = true; // Refresh lists
     saveData();
     document.getElementById('studentName').value = ''; document.getElementById('studentTownship').value = '';
   }
@@ -708,6 +709,7 @@
       db.students = db.students.filter(s => s.id !== id);
       delete db.scores[id];
       pushLog(`System: Admin deleted student '${student.name}'.`);
+      forceStudentRender = forceJudgeRender = true;
       saveData();
     }
   }
@@ -725,6 +727,11 @@
   }
 
   function renderAdminStudentList() {
+    const newHash = JSON.stringify(db.students);
+    if (lastStudentHash === newHash && !forceStudentRender) return; // Smart DOM check
+    lastStudentHash = newHash;
+    forceStudentRender = false;
+
     const tbody = document.getElementById('adminStudentList');
     tbody.innerHTML = '';
     db.students.forEach(s => {
@@ -753,6 +760,7 @@
           const newStudents = imported.map(s => ({ id: genId(), name: s.name, township: s.township }));
           db.students = db.students.concat(newStudents);
           pushLog(`System: Admin imported ${imported.length} students.`);
+          forceStudentRender = forceJudgeRender = true;
           saveData();
         }
       } catch (err) { showToast("Error reading student file. Invalid format."); }
@@ -773,18 +781,41 @@
     
     db.judges.push({ id: genId(), name, password: pwd, forbiddenTownships: "" });
     pushLog(`System: Admin created Judge '${name}'.`);
+    forceJudgeRender = true;
     saveData();
     document.getElementById('judgeName').value = ''; document.getElementById('judgePassword').value = '';
   }
 
   function renderAdminJudgeList() {
+    const newHash = JSON.stringify(db.judges);
+    // If the database array of judges hasn't structurally changed, DO NOT REDRAW. This protects user typing!
+    if (lastJudgeHash === newHash && !forceJudgeRender) return;
+    lastJudgeHash = newHash;
+    forceJudgeRender = false;
+
     const tbody = document.getElementById('adminJudgeList');
     tbody.innerHTML = '';
+    
+    // Dynamically pull all unique townships from the students list
+    const allTownships = [...new Set(db.students.map(s => s.township.trim()))].filter(Boolean);
+
     db.judges.forEach(j => {
+      let currentForb = (j.forbiddenTownships || '').split(',').map(s => s.trim().toLowerCase());
+      
+      // Build interactive checkboxes
+      let checkboxesHTML = allTownships.map(t => {
+        let isChecked = currentForb.includes(t.toLowerCase()) ? 'checked' : '';
+        return `<label style="display:inline-flex; align-items:center; margin-right:8px; margin-bottom:5px; font-size:0.85rem; color:#ccc;">
+                  <input type="checkbox" class="jForbCheck_${j.id}" value="${t}" ${isChecked} style="margin:0 4px 0 0; width:auto;"> ${t}
+                </label>`;
+      }).join('');
+      
+      if (allTownships.length === 0) checkboxesHTML = `<span style="font-size:0.8rem; color:#777;">Add students to generate townships</span>`;
+
       tbody.innerHTML += `<tr>
         <td><input type="text" id="jName_${j.id}" class="table-input" value="${j.name}"></td>
-        <td><input type="password" id="jPass_${j.id}" class="table-input" value="${j.password}" maxlength="4"></td>
-        <td><input type="text" id="jForb_${j.id}" class="table-input" value="${j.forbiddenTownships || ''}" placeholder="E.g. Pakokku"></td>
+        <td><input type="password" id="jPass_${j.id}" class="table-input" value="${j.password}" maxlength="4" style="width:70px;"></td>
+        <td><div style="display:flex; flex-wrap:wrap; max-width: 250px;">${checkboxesHTML}</div></td>
         <td style="white-space: nowrap;">
           <button onclick="updateJudge('${j.id}')">Save</button>
           <button class="danger-btn" onclick="removeJudge('${j.id}')">Delete</button>
@@ -798,10 +829,16 @@
     if(judge) {
       const newPwd = document.getElementById(`jPass_${id}`).value;
       if (!/^\d{4}$/.test(newPwd)) return showToast("PIN must be exactly 4 digits.");
+      
       judge.name = document.getElementById(`jName_${id}`).value;
       judge.password = newPwd;
-      judge.forbiddenTownships = document.getElementById(`jForb_${id}`).value;
+      
+      // Collect all checked boxes seamlessly
+      const checkedBoxes = Array.from(document.querySelectorAll(`.jForbCheck_${id}:checked`)).map(cb => cb.value);
+      judge.forbiddenTownships = checkedBoxes.join(', ');
+
       pushLog(`System: Admin updated restrictions for Judge '${judge.name}'.`);
+      forceJudgeRender = true; // Tell the virtual DOM to redraw this new correct data
       saveData();
     }
   }
@@ -811,6 +848,7 @@
     if(judge && confirm("Delete this judge account? Their previously submitted scores will remain.")) {
       db.judges = db.judges.filter(j => j.id !== id);
       pushLog(`System: Admin deleted Judge '${judge.name}'.`);
+      forceJudgeRender = true;
       saveData();
     }
   }
@@ -835,6 +873,7 @@
         if (confirm(`Import ${imported.length} judges? This will add them to the existing list.`)) {
           db.judges = db.judges.concat(imported);
           pushLog(`System: Admin imported ${imported.length} judges.`);
+          forceJudgeRender = true;
           saveData();
         }
       } catch (err) { showToast("Error reading judge file. Invalid format."); }
@@ -856,11 +895,17 @@
     
     db.observers.push({ id: genId(), name, password: pwd });
     pushLog(`System: Admin created Observer '${name}'.`);
+    forceObserverRender = true;
     saveData();
     document.getElementById('observerName').value = ''; document.getElementById('observerPassword').value = '';
   }
 
   function renderAdminObserverList() {
+    const newHash = JSON.stringify(db.observers || []);
+    if (lastObserverHash === newHash && !forceObserverRender) return;
+    lastObserverHash = newHash;
+    forceObserverRender = false;
+
     const tbody = document.getElementById('adminObserverList');
     tbody.innerHTML = '';
     (db.observers || []).forEach(o => {
@@ -877,6 +922,7 @@
     if(observer && confirm("Delete this observer account?")) {
       db.observers = db.observers.filter(o => o.id !== id);
       pushLog(`System: Admin deleted Observer '${observer.name}'.`);
+      forceObserverRender = true;
       saveData();
     }
   }
@@ -963,6 +1009,7 @@
       try { 
         db = JSON.parse(e.target.result); 
         pushLog(`System: Admin restored master database from file.`);
+        forceStudentRender = forceJudgeRender = forceObserverRender = true;
         saveData(); 
       } catch (err) { showToast("Error reading file."); }
     };
@@ -973,6 +1020,7 @@
     if (confirm("WARNING: Deletes all data globally from the cloud! Are you sure?")) {
       db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000' }, logs: [], presence: {} };
       pushLog("System: ALL DATA FACTORY RESET BY ADMIN.");
+      forceStudentRender = forceJudgeRender = forceObserverRender = true;
       saveData();
     }
   }
@@ -1204,8 +1252,7 @@
        msg += ` Logged in: ${observers.join(', ')}.`;
     }
     
-    // Don't show toast if editing to avoid distraction
-    if (!window.isEditing) showToast(msg);
+    showToast(msg);
   }, 30000);
 
 </script>
