@@ -109,10 +109,10 @@
   .log-list li { padding: 8px 0; border-bottom: 1px dashed #233554; }
   .log-timestamp { color: #FFC107; margin-right: 10px; }
 
-  /* Slide-in Toast Notifications */
+  /* Slide-in Toast Notifications - Reduced Animation Speed */
   #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
   .toast { background: rgba(17, 34, 64, 0.95); border-left: 4px solid #FFC107; color: white; padding: 15px 20px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 0.9rem; 
-           animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards, fadeOut 0.4s 4s ease-in forwards; pointer-events: auto; }
+           animation: slideIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards, fadeOut 1.2s 5s ease-in forwards; pointer-events: auto; }
   @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
   @keyframes fadeOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
 
@@ -476,13 +476,13 @@
   Parse.serverURL = 'https://parseapi.back4app.com/';
   // ==========================================
 
-  let db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [] };
+  let db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [], presence: {} };
   let currentUser = null; 
   let expandedRows = new Set(); 
   const genId = () => Math.random().toString(36).substr(2, 9);
   let parseDocId = null;
 
-  // SMART VIRTUAL DOM LOCKS - Prevents the screen from overwriting or flashing!
+  // SMART VIRTUAL DOM LOCKS
   let lastStudentHash = "";
   let lastJudgeHash = "";
   let lastObserverHash = "";
@@ -494,7 +494,10 @@
   let forceJudgeRender = true;
   let forceObserverRender = true;
   let forceJudgeStudentRender = true;
+  
+  // THE GHOST DATA ASSASSIN
   window.isSaving = false;
+  window.lastFetchReq = 0;
 
   // Toast Notification Logic
   function createToastContainer() {
@@ -513,17 +516,30 @@
     toast.className = 'toast';
     toast.innerText = message;
     container.appendChild(toast);
-    setTimeout(() => toast.remove(), 4500);
+    setTimeout(() => toast.remove(), 6000);
   }
 
   async function fetchDb() {
     if (window.isSaving) return; 
 
+    // Generate unique stamp for this specific fetch request
+    const currentReq = Date.now();
+    window.lastFetchReq = currentReq;
+
     const AppData = Parse.Object.extend("AppData");
     const query = new Parse.Query(AppData);
+    query.descending("createdAt"); // Always fetch the absolute newest row
+    query.limit(1);
+    
     try {
       const results = await query.find();
-      if (window.isSaving) return; 
+
+      // 🛡️ GHOST DATA ASSASSIN 🛡️
+      // If the Admin hit "Save" or "Factory Reset" while this network request was flying through the air,
+      // it aborts instantly and permanently deletes the old data instead of rendering it.
+      if (window.isSaving || window.lastFetchReq !== currentReq) {
+          return; 
+      }
 
       if (results.length > 0) {
         parseDocId = results[0].id;
@@ -535,37 +551,39 @@
             observers: data.observers || [],
             scores: data.scores || {},
             settings: data.settings || { votingOpen: true, adminPin: '0000' },
-            logs: data.logs || []
+            logs: data.logs || [],
+            presence: data.presence || {}
           };
           if(!db.settings.adminPin) db.settings.adminPin = '0000';
         }
       } else {
-        db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [] };
-        const newDoc = new AppData();
-        newDoc.set("payload", db);
-        const saved = await newDoc.save();
-        parseDocId = saved.id;
+        db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [], presence: {} };
       }
       updateUI();
-    } catch (error) {
-      console.error("Back4App connection error: " + error.message);
-    }
+    } catch (error) {}
   }
 
   async function saveData(silent = false) { 
     window.isSaving = true; 
-    if (!parseDocId) {
-        await fetchDb();
-    }
+    window.lastFetchReq = 0; // Kills all incoming network requests instantly
+
     const AppData = Parse.Object.extend("AppData");
-    const obj = new AppData();
-    obj.id = parseDocId;
+    let obj;
     
+    if (parseDocId) {
+        obj = new AppData();
+        obj.id = parseDocId;
+    } else {
+        obj = new AppData(); // Make a brand new file if one doesn't exist
+    }
+
+    // Force Deep Clone to guarantee the Parse SDK pushes it to the server
     obj.set("payload", JSON.parse(JSON.stringify(db)));
     
     try {
-        await obj.save();
-        window.isSaving = false;
+        const saved = await obj.save();
+        parseDocId = saved.id;
+        setTimeout(() => { window.isSaving = false; }, 800); // Hold lock for 800ms to guarantee server registers it
         if (!silent) showToast("Changes saved successfully!");
     } catch (error) {
         window.isSaving = false;
@@ -575,63 +593,15 @@
   
   function pushLog(msg) { db.logs.push({ time: new Date().toLocaleTimeString(), message: msg }); }
 
-  /* ============================================================== */
-  /* ISOLATED PRESENCE TRACKER - Solves the Reset/Disappearing Bug! */
-  /* ============================================================== */
-  async function pingPresence() {
-    if (!currentUser) return;
-    const role = currentUser.role;
-    const name = (role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name);
-
-    const Presence = Parse.Object.extend("PresenceTracker");
-    const query = new Parse.Query(Presence);
-    query.equalTo("userName", name);
-    try {
-        let pObj;
-        const results = await query.find();
-        if (results.length > 0) {
-            pObj = results[0];
-        } else {
-            pObj = new Presence();
-            pObj.set("userName", name);
-            pObj.set("role", role);
-        }
-        pObj.set("lastActive", Date.now());
-        await pObj.save(); // Saves safely without touching the Scores/Students database!
-    } catch(e) { console.log(e) }
-  }
-
-  let lastViewerMsg = "";
-  async function checkViewers() {
-    const Presence = Parse.Object.extend("PresenceTracker");
-    const query = new Parse.Query(Presence);
+  function pingPresence() {
+    if (!currentUser || window.isSaving) return;
+    const id = (currentUser.role === 'admin' ? 'admin' : currentUser.id);
+    const name = (currentUser.role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name);
     
-    // Accurately finds anyone who has pinged the server in the last 60 seconds
-    query.greaterThan("lastActive", Date.now() - 60000); 
-    try {
-        const results = await query.find();
-        let count = results.length;
-        let adminWatching = false;
-        let observers = [];
-
-        results.forEach(r => {
-            const role = r.get("role");
-            const name = r.get("userName");
-            if (role === 'admin') adminWatching = true;
-            else if (role === 'observer') observers.push(name);
-        });
-
-        let msg = `👁 ${count} user(s) currently active.`;
-        if (adminWatching) msg += ` Admin is online.`;
-        if (observers.length > 0) msg += ` Logged in: ${observers.join(', ')}.`;
-
-        if (msg !== lastViewerMsg) {
-            showToast(msg);
-            lastViewerMsg = msg;
-        }
-    } catch(e) {}
+    if (!db.presence) db.presence = {};
+    db.presence[id] = { name: name, time: Date.now() };
+    saveData(true); 
   }
-  /* ============================================================== */
 
   function updateUI() {
     renderLeaderboard();
@@ -714,6 +684,11 @@
   }
 
   function logout() { 
+    if (currentUser) {
+        const id = (currentUser.role === 'admin' ? 'admin' : currentUser.id);
+        delete db.presence[id];
+        saveData(true); 
+    }
     currentUser = null; 
     document.getElementById('authButtons').style.display = 'block'; 
     document.getElementById('userMenu').style.display = 'none'; 
@@ -1062,37 +1037,61 @@
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
       try { 
         db = JSON.parse(e.target.result); 
         pushLog(`System: Admin restored master database from file.`);
         forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
-        saveData(); 
+        await saveData(); 
       } catch (err) { showToast("Error reading file."); }
     };
     reader.readAsText(file);
   }
 
-  function clearAllData() {
+  async function clearAllData() {
     if (confirm("WARNING: Deletes all data globally from the cloud! Are you sure?")) {
-      db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000' }, logs: [] };
+      window.isSaving = true; 
+      window.lastFetchReq = 0; 
+      db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000' }, logs: [], presence: {} };
       pushLog("System: ALL DATA FACTORY RESET BY ADMIN.");
       forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
-      saveData();
+      
+      try {
+        const AppData = Parse.Object.extend("AppData");
+        const query = new Parse.Query(AppData);
+        const allDocs = await query.find();
+        await Parse.Object.destroyAll(allDocs); // Physically burns ghost data
+      } catch(e) {}
+      
+      parseDocId = null;
+      await saveData();
+      window.isSaving = false;
     }
   }
 
-  function publicWipeData() {
+  async function publicWipeData() {
     const pin = prompt("Enter Admin PIN to authorize system wipe:");
     const adminPin = db.settings.adminPin || '0000';
     
     if (pin === adminPin) {
       if (confirm("STEP 2: ALL DATA WILL BE DELETED GLOABLLY. Are you absolutely sure?")) {
         if (confirm("FINAL WARNING: Click OK to factory reset the entire database. This cannot be undone.")) {
-          db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin }, logs: [] };
+          window.isSaving = true;
+          window.lastFetchReq = 0;
+          db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin }, logs: [], presence: {} };
           pushLog("System: ALL DATA FACTORY RESET FROM PUBLIC PAGE.");
           forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
-          saveData();
+          
+          try {
+            const AppData = Parse.Object.extend("AppData");
+            const query = new Parse.Query(AppData);
+            const allDocs = await query.find();
+            await Parse.Object.destroyAll(allDocs); 
+          } catch(e) {}
+
+          parseDocId = null;
+          await saveData();
+          window.isSaving = false;
         }
       }
     } else if (pin !== null) {
@@ -1301,11 +1300,43 @@
   setInterval(fetchDb, 3000);
   fetchDb();
 
-  // Sends isolated heartbeat every 45 seconds so server knows who is online
+  // Keep presence updated every 45 seconds to avoid timeouts
   setInterval(pingPresence, 45000);
 
   // Checks Viewer Tracker every 30 seconds
-  setInterval(checkViewers, 30000);
+  let lastViewerMsg = "";
+  setInterval(() => {
+    const now = Date.now();
+    let count = 0;
+    let adminWatching = false;
+    let observers = [];
+    
+    if (db.presence) {
+        Object.values(db.presence).forEach(p => {
+            // Tolerates up to 120 seconds (2 minutes) to account for device clock differences!
+            if (now - p.time < 120000) { 
+                count++;
+                if (p.name === 'U Nine Nine - Pakokku') {
+                    adminWatching = true;
+                } else if (p.name !== 'Public Viewer') {
+                    observers.push(`${p.name}`);
+                }
+            }
+        });
+    }
+    
+    let msg = `👁 ${count} user(s) currently active.`;
+    if (adminWatching) msg += ` Admin is online.`;
+    if (observers.length > 0) {
+       msg += ` Logged in: ${observers.join(', ')}.`;
+    }
+    
+    // ONLY shows pop-up if someone actually joined or left!
+    if (msg !== lastViewerMsg) {
+        showToast(msg);
+        lastViewerMsg = msg;
+    }
+  }, 30000);
 
 </script>
 </body>
