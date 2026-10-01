@@ -479,8 +479,23 @@
   let currentUser = null; 
   let expandedRows = new Set(); 
   const genId = () => Math.random().toString(36).substr(2, 9);
-  
   let parseDocId = null;
+
+  // SMART SYNC LOCK - Prevents background refresh from wiping out data while you are typing!
+  window.isEditing = false;
+  window.isSaving = false;
+
+  document.addEventListener('focusin', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
+      window.isEditing = true;
+    }
+  });
+
+  document.addEventListener('focusout', (e) => {
+    if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') {
+      setTimeout(() => { window.isEditing = false; }, 800); // 800ms buffer before allowing sync to overwrite
+    }
+  });
 
   // Toast Notification Logic
   function createToastContainer() {
@@ -503,10 +518,17 @@
   }
 
   async function fetchDb() {
+    // If the Admin is typing or saving data, completely abort the background pull!
+    if (window.isEditing || window.isSaving) return; 
+
     const AppData = Parse.Object.extend("AppData");
     const query = new Parse.Query(AppData);
     try {
       const results = await query.find();
+      
+      // Double check lock in case they clicked an input during network transit time
+      if (window.isEditing || window.isSaving) return; 
+
       if (results.length > 0) {
         parseDocId = results[0].id;
         const data = results[0].get("payload");
@@ -535,42 +557,40 @@
     }
   }
 
-  function saveData(silent = false) { 
-    if (!parseDocId) return fetchDb().then(() => saveData(silent));
+  async function saveData(silent = false) { 
+    window.isSaving = true; // Lock sync globally
+    if (!parseDocId) {
+        await fetchDb();
+    }
+    
     const AppData = Parse.Object.extend("AppData");
     const obj = new AppData();
     obj.id = parseDocId;
     obj.set("payload", db);
-    obj.save().then(() => {
+    
+    try {
+        await obj.save();
+        setTimeout(() => { window.isSaving = false; }, 1000); // Release lock 1 sec after save completes
         if (!silent) showToast("Changes saved successfully!");
-    }).catch(error => { 
+    } catch (error) {
+        window.isSaving = false; // Release lock on error
         if (!silent) showToast("Error saving data: " + error.message); 
-    }); 
+    }
   }
   
   function pushLog(msg) { db.logs.push({ time: new Date().toLocaleTimeString(), message: msg }); }
 
-  // Isolated Presence Update to completely stop Database Race Conditions
-  async function updatePresence() {
+  function updatePresence() {
+    // Only logged in users log their presence to prevent unneeded database writes
+    if (!currentUser) return; 
     if (!parseDocId) return;
-    if (!window.localSessionId) window.localSessionId = genId();
+    if (window.isEditing || window.isSaving) return; // Don't interrupt important work
     
-    const id = currentUser ? (currentUser.role === 'admin' ? 'admin' : currentUser.id) : 'public_' + window.localSessionId;
-    const name = currentUser ? (currentUser.role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name) : 'Public Viewer';
+    const id = (currentUser.role === 'admin' ? 'admin' : currentUser.id);
+    const name = (currentUser.role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name);
     
-    const AppData = Parse.Object.extend("AppData");
-    const query = new Parse.Query(AppData);
-    try {
-        const results = await query.find();
-        if (results.length > 0) {
-            const serverData = results[0].get("payload");
-            if (!serverData.presence) serverData.presence = {};
-            serverData.presence[id] = { name: name, time: Date.now() };
-            results[0].set("payload", serverData);
-            await results[0].save();
-            // Do not sync the rest of the db back here. Let the 3-second fetch cycle do its job!
-        }
-    } catch (e) {}
+    db.presence[id] = { name: name, time: Date.now() };
+    saveData(true); // Silent background save
   }
 
   function updateUI() {
@@ -758,12 +778,6 @@
   }
 
   function renderAdminJudgeList() {
-    // Focus Protection: Protects admin typing from being overwritten by 3-second auto refresh
-    const active = document.activeElement;
-    if (active && active.tagName === 'INPUT' && active.id && (active.id.startsWith('jName_') || active.id.startsWith('jPass_') || active.id.startsWith('jForb_'))) {
-      return; 
-    }
-
     const tbody = document.getElementById('adminJudgeList');
     tbody.innerHTML = '';
     db.judges.forEach(j => {
@@ -1007,10 +1021,6 @@
   /* JUDGE SCORING LOGIC */
   function populateJudgeStudents() {
     const select = document.getElementById('judgeStudentSelect');
-    
-    // Focus Protection for the dropdown menu!
-    if (document.activeElement === select) return; 
-
     const currentVal = select.value;
     select.innerHTML = '<option value="">-- Select Student --</option>';
     
@@ -1194,7 +1204,8 @@
        msg += ` Logged in: ${observers.join(', ')}.`;
     }
     
-    showToast(msg);
+    // Don't show toast if editing to avoid distraction
+    if (!window.isEditing) showToast(msg);
   }, 30000);
 
 </script>
