@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
 <title>IPS Presentation Contest</title>
+<!-- Parse SDK for Back4App Cloud Sync -->
+<script type="text/javascript" src="https://npmcdn.com/parse/dist/parse.min.js"></script>
 <style>
   body {
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -21,18 +23,20 @@
     overflow-x: hidden;
   }
   
-  .header-section { text-align: center; z-index: 10; width: 100%; margin-bottom: 10px; }
+  .header-section { text-align: center; z-index: 10; width: 100%; margin-bottom: 5px; }
   h1 { font-size: clamp(1.5rem, 4vw, 2.5rem); text-shadow: 2px 2px 4px rgba(0,0,0,0.5); margin: 5px 0; }
   
   .controls { display: flex; gap: 10px; margin: 10px 0; flex-wrap: wrap; justify-content: center; z-index: 10; align-items: center; }
   
-  select, .add-btn {
+  select, .add-btn, .pass-input {
     padding: 10px 15px; font-size: 1.1rem; border-radius: 25px;
     border: 2px solid #00d2ff; background: rgba(255,255,255,0.1);
     color: white; outline: none; text-align: center;
   }
-  select { width: clamp(140px, 30vw, 200px); cursor: pointer; }
+  select { width: clamp(130px, 25vw, 180px); cursor: pointer; }
   select option { background: #0f2027; color: white; }
+  
+  #studentSelect { width: clamp(140px, 30vw, 200px); }
   
   .add-btn { background: #2ecc71; border: none; cursor: pointer; font-weight: bold; padding: 10px 20px; }
   .add-btn:hover { background: #27ae60; }
@@ -45,13 +49,19 @@
   button.spin-btn:hover { background: #f1c40f; transform: scale(1.05); }
   button.spin-btn:disabled { background: #7f8c8d; cursor: not-allowed; transform: none; }
 
+  #activePoolBadge {
+    background: rgba(46, 204, 113, 0.2); border: 1px solid #2ecc71; color: #2ecc71;
+    padding: 8px 20px; border-radius: 25px; font-weight: bold; font-size: 1.1rem;
+    margin: 5px 0; display: inline-block; box-shadow: 0 2px 10px rgba(0,0,0,0.3);
+  }
+
   .contestant-name {
     font-size: clamp(2rem, 6vw, 3.5rem); color: #f1c40f;
     text-shadow: 0 0 15px rgba(241, 196, 15, 0.6), 2px 2px 5px rgba(0,0,0,0.8);
     margin: 5px 0 0 0; text-align: center; display: none; font-weight: bold; letter-spacing: 2px;
   }
-  .contestant-township {
-    font-size: clamp(1rem, 3vw, 1.5rem); color: #00d2ff;
+  .contestant-details {
+    font-size: clamp(1rem, 3vw, 1.3rem); color: #00d2ff;
     text-shadow: 1px 1px 3px rgba(0,0,0,0.8); margin-bottom: 10px;
     text-align: center; display: none;
   }
@@ -59,12 +69,12 @@
   @keyframes popIn { 0% { transform: scale(0.5); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
 
   .arena {
-    position: relative; flex-grow: 1; width: 100%; max-width: 800px;
-    display: flex; flex-direction: column; justify-content: center; align-items: center; margin-top: 10px;
+    position: relative; flex-grow: 1; width: 100%; max-width: 900px;
+    display: flex; flex-direction: column; justify-content: center; align-items: center; margin-top: 5px;
   }
 
   .wheel-wrapper {
-    position: relative; width: clamp(250px, 55vmin, 400px); height: clamp(250px, 55vmin, 400px); z-index: 1; margin-bottom: 20px;
+    position: relative; width: clamp(220px, 50vmin, 350px); height: clamp(220px, 50vmin, 350px); z-index: 1; margin-bottom: 30px;
   }
   canvas { width: 100%; height: 100%; filter: drop-shadow(0 10px 20px rgba(0,0,0,0.5)); }
   
@@ -77,19 +87,37 @@
 
   .topic-card {
     position: absolute; background: rgba(15, 32, 39, 0.95); border: 2px solid #00d2ff;
-    border-radius: 8px; padding: 10px; width: clamp(110px, 24vw, 180px); height: clamp(50px, 12vw, 80px);
+    border-radius: 8px; padding: 8px; width: clamp(100px, 24vw, 160px); height: clamp(45px, 12vw, 70px);
     display: flex; align-items: center; justify-content: center; text-align: center;
-    font-size: clamp(0.7rem, 1.8vw, 1rem); font-weight: bold; opacity: 0;
-    transform: scale(0.5); transition: all 0.3s ease; z-index: 10; box-shadow: 0 5px 15px rgba(0,0,0,0.7);
+    font-size: clamp(0.7rem, 1.8vw, 0.95rem); font-weight: bold; opacity: 0;
+    transform: scale(0.5); transition: all 0.3s ease; z-index: 20; box-shadow: 0 5px 15px rgba(0,0,0,0.7);
   }
   .topic-card.show { opacity: 1; transform: scale(1); background: #00d2ff; color: #0f2027; }
 
-  .pos-0 { top: -10%; left: -5%; }
-  .pos-1 { top: -10%; right: -5%; }
+  /* Default Portrait Positions */
+  .pos-0 { top: -5%; left: -5%; }
+  .pos-1 { top: -5%; right: -5%; }
   .pos-2 { bottom: 5%; left: -5%; }
   .pos-3 { bottom: 5%; right: -5%; }
-  .pos-4 { bottom: -15%; left: 50%; transform: translateX(-50%) scale(0.5); }
+  .pos-4 { bottom: -18%; left: 50%; transform: translateX(-50%) scale(0.5); }
   .pos-4.show { transform: translateX(-50%) scale(1); }
+
+  /* Landscape Orientation Fixes */
+  @media (orientation: landscape) {
+    .pos-0 { top: 5%; left: -60%; }
+    .pos-1 { top: 5%; right: -60%; }
+    .pos-2 { bottom: 15%; left: -60%; }
+    .pos-3 { bottom: 15%; right: -60%; }
+    .pos-4 { bottom: -20%; left: 50%; transform: translateX(-50%) scale(0.5); }
+    .pos-4.show { transform: translateX(-50%) scale(1); }
+    
+    .wheel-wrapper {
+      width: clamp(180px, 45vmin, 280px); 
+      height: clamp(180px, 45vmin, 280px);
+      margin-bottom: 20px;
+    }
+    h1 { font-size: clamp(1.2rem, 3vw, 1.8rem); margin: 2px 0; }
+  }
 
   .floating-menu { position: fixed; bottom: 15px; right: 15px; display: flex; flex-wrap: wrap; gap: 10px; z-index: 100; justify-content: flex-end; }
   .float-btn {
@@ -120,6 +148,7 @@
   .bg-blue { background: #3498db; color: white; }
   .bg-green { background: #2ecc71; color: white; }
   .bg-gray { background: #95a5a6; color: white; }
+  .bg-orange { background: #e67e22; color: white; }
 </style>
 </head>
 <body>
@@ -127,46 +156,73 @@
 <div class="header-section">
   <h1>IPS Presentation Contest</h1>
   <div class="controls">
+    <select id="poolSelect" onchange="handleManualPoolSwitch()">
+      <option value="G1-5">Grades 1-5 Pool</option>
+      <option value="G6-9">Grades 6-9 Pool</option>
+    </select>
     <select id="townshipSelect" onchange="populateStudentDropdown()">
       <option value="">-- All Townships --</option>
     </select>
-    <select id="studentSelect">
+    <select id="studentSelect" onchange="onStudentSelected()">
       <option value="">-- Select Student --</option>
     </select>
-    <button class="add-btn" onclick="addStudentOnTheSpot()">➕ New</button>
-    <button class="spin-btn" id="drawBtn" onclick="startDrawSequence()">Spin Wheel</button>
+    <button class="add-btn" id="newBtn" onclick="addStudentOnTheSpot()" disabled>➕ New</button>
+    <button class="spin-btn" id="drawBtn" onclick="startDrawSequence()" disabled>Connecting...</button>
   </div>
 </div>
 
 <div class="arena" id="arena">
+  <div id="activePoolBadge">Active Pool: Grades 1-5 Pool</div>
   <div id="prominentName" class="contestant-name"></div>
-  <div id="prominentTownship" class="contestant-township"></div>
-  <div class="wheel-wrapper">
+  <div id="prominentDetails" class="contestant-details"></div>
+  <div class="wheel-wrapper" id="wheelWrapper">
     <canvas id="wheelCanvas" width="500" height="500"></canvas>
     <div class="pointer"></div>
   </div>
 </div>
 
 <div class="floating-menu">
-  <button class="float-btn reset" onclick="globalWipe()">🛑 Factory Reset</button>
-  <button class="float-btn" onclick="openHistory()">📜 History</button>
-  <button class="float-btn" onclick="requestAdmin()">⚙ Admin</button>
+  <button class="float-btn reset" onclick="openPasswordModal('reset')">🛑 Factory Reset</button>
+  <button class="float-btn" onclick="openHistory()">📜 Cloud History</button>
+  <button class="float-btn" onclick="openPasswordModal('admin')">⚙ Admin</button>
+</div>
+
+<!-- Password Modal -->
+<div id="passwordModal" class="modal">
+  <div class="modal-content" style="max-width: 350px; text-align: center;">
+    <h3 style="margin-top: 0;">Security Verification</h3>
+    <p style="font-size: 0.9rem; color: #ccc;">Please enter the Admin Password:</p>
+    <input type="password" id="adminPassword" class="pass-input" style="width: 100%; margin-bottom: 20px; box-sizing: border-box;" onkeypress="handlePassEnter(event)" placeholder="Password...">
+    <div class="action-row">
+      <button class="action-btn bg-blue" onclick="submitPassword()">Unlock</button>
+      <button class="action-btn bg-gray" onclick="closePasswordModal()">Cancel</button>
+    </div>
+  </div>
 </div>
 
 <!-- Admin Panel Modal -->
 <div id="adminModal" class="modal">
   <div class="modal-content">
-    <h3>Admin: Manage Data</h3>
+    <h3>Admin: Manage Cloud Data</h3>
     
-    <label>Essay Topics (One per line):</label>
-    <textarea id="topicList" rows="5" oninput="autoSaveAdmin()"></textarea>
+    <label>Grades 1-5 Topics (One per line):</label>
+    <textarea id="topicListG15" rows="4"></textarea>
+
+    <label>Grades 6-9 Topics (One per line):</label>
+    <textarea id="topicListG69" rows="4"></textarea>
     
-    <label>Pre-added Students (Format: Township: Student Name):</label>
-    <textarea id="studentList" rows="6" oninput="autoSaveAdmin()" placeholder="Pakokku: Mg 1&#10;Yangon: Mg 2"></textarea>
+    <label>Pre-added Students (Format: Township: Student Name). Edit list freely below:</label>
+    <textarea id="studentList" rows="8"></textarea>
+    
+    <input type="file" id="jsonUpload" accept=".json" onchange="importJSON(event)" style="display: none;">
     
     <div class="action-row">
-      <button class="action-btn bg-red" onclick="clearPool()">Clear All Data</button>
-      <button class="action-btn bg-blue" onclick="reloadApp()">Save & Refresh</button>
+      <button class="action-btn bg-orange" onclick="document.getElementById('jsonUpload').click()">📂 Import JSON</button>
+      <button class="action-btn bg-orange" onclick="exportStudentsJSON()">💾 Export JSON</button>
+    </div>
+    <div class="action-row">
+      <button class="action-btn bg-blue" id="saveApplyBtn" onclick="saveCloudData()">☁ Save & Apply Data</button>
+      <button class="action-btn bg-red" onclick="clearPool()">Clear Fields</button>
       <button class="action-btn bg-gray" onclick="closeModals()">Close</button>
     </div>
   </div>
@@ -175,38 +231,37 @@
 <!-- History Panel Modal -->
 <div id="historyModal" class="modal">
   <div class="modal-content">
-    <h3>Draw History</h3>
+    <h3 id="historyTitle">Draw History (Loading...)</h3>
     <div style="overflow-x: auto;">
       <table id="historyTable">
-        <thead><tr><th>Time</th><th>Township</th><th>Student</th><th>Topic 1</th><th>Topic 2</th><th>Topic 3</th><th>Topic 4</th><th>Topic 5</th></tr></thead>
+        <thead><tr><th>Time</th><th>Pool</th><th>Township</th><th>Student</th><th>Topic 1</th><th>Topic 2</th><th>Topic 3</th><th>Topic 4</th><th>Topic 5</th></tr></thead>
         <tbody id="historyBody"></tbody>
       </table>
     </div>
     <div class="action-row">
       <button class="action-btn bg-green" onclick="exportCSV()">Export to Excel</button>
-      <button class="action-btn bg-red" onclick="clearHistory()">Clear History</button>
+      <button class="action-btn bg-red" onclick="clearHistory()">Clear History Database</button>
       <button class="action-btn bg-gray" onclick="closeModals()">Close</button>
     </div>
   </div>
 </div>
 
 <script>
-  const STORAGE_TOPICS = 'ips_topics_v6';
-  const STORAGE_HISTORY = 'ips_history_v6';
-  const STORAGE_STUDENTS = 'ips_students_v6';
-  
-  const defaultTopics = [
-    "Impact of Social Media", "Climate Change", "Reading Books", "AI in Education",
-    "My Role Model", "Overcoming Failure", "Value of Teamwork", "Traditional vs Modern Ed", 
-    "Positive Thinking", "Learning English", "Sports in School", "A Day That Changed Me", 
-    "Protecting Environment", "Future of Tech", "Mental Health Matters"
-  ];
-  
-  const defaultStudents = [
-    "Pakokku: Mg 1", "Pakokku: M2", "Pakokku: M3",
-    "Yangon: Mg 4", "Yangon: M5"
-  ];
+  // ---- Back4App Parse SDK Initialization ----
+  Parse.initialize("KQHogVKClAE7uofUaEr6IswMkNFXENXFktQSGbrR", "2sWSdVYGDXcsy2fWmvSi1FPfE7HzAyvwQw49a8R1");
+  Parse.serverURL = 'https://parseapi.back4app.com/';
 
+  const defaultTopicsG15 = [
+    "My Favorite Animal", "A Day at the Park", "Why Reading is Good", "My Best Friend",
+    "Saving Water", "My Dream Job", "A Great Holiday", "Healthy Foods",
+    "My Favorite Subject", "Helping Others"
+  ];
+  const defaultTopicsG69 = [
+    "Impact of Social Media", "Climate Change", "AI in Education", "Overcoming Failure", 
+    "Value of Teamwork", "Traditional vs Modern Ed", "Positive Thinking", "Learning English", 
+    "Sports in School", "A Day That Changed Me", "Protecting Environment", "Future of Tech"
+  ];
+  
   const colors = ['#e74c3c', '#3498db', '#f1c40f', '#2ecc71', '#9b59b6', '#e67e22', '#1abc9c', '#34495e', '#d35400', '#2980b9'];
 
   let masterPool = [];
@@ -214,7 +269,11 @@
   let currentStudentTopics = [];
   let currentStudentName = "";
   let currentStudentTownship = "";
+  let currentPoolSelected = "";
+  let previousPool = "G1-5";
   let drawsRemaining = 0;
+  
+  let cloudConfigId = null; // Tracks the primary ContestData object
   
   const canvas = document.getElementById("wheelCanvas");
   const ctx = canvas.getContext("2d");
@@ -223,33 +282,250 @@
   let isSpinning = false;
 
   window.onload = () => {
-    if (!localStorage.getItem(STORAGE_TOPICS)) { localStorage.setItem(STORAGE_TOPICS, defaultTopics.join('\n')); }
-    document.getElementById('topicList').value = localStorage.getItem(STORAGE_TOPICS);
-    
-    if (!localStorage.getItem(STORAGE_STUDENTS)) { localStorage.setItem(STORAGE_STUDENTS, defaultStudents.join('\n')); }
-    document.getElementById('studentList').value = localStorage.getItem(STORAGE_STUDENTS);
-    
-    populateTownships();
-    
-    masterPool = getSavedArray(STORAGE_TOPICS);
-    currentWheelPool = [...masterPool]; 
-    drawWheel();
+    initCloudData();
   };
 
-  function getSavedArray(key) { 
-    return (localStorage.getItem(key) || "").split('\n').map(t => t.trim()).filter(t => t !== ''); 
+  // ---- Core Cloud Functions ----
+  async function initCloudData() {
+    try {
+      const query = new Parse.Query("ContestData");
+      let results = await query.find();
+      let dataObj;
+      
+      if (results.length === 0) {
+        // Create initial default database record
+        const ContestData = Parse.Object.extend("ContestData");
+        dataObj = new ContestData();
+        dataObj.set("topicsG15", defaultTopicsG15.join('\n'));
+        dataObj.set("topicsG69", defaultTopicsG69.join('\n'));
+        dataObj.set("students", "");
+        await dataObj.save();
+      } else {
+        dataObj = results[0];
+      }
+      
+      cloudConfigId = dataObj.id;
+      document.getElementById('topicListG15').value = dataObj.get("topicsG15") || "";
+      document.getElementById('topicListG69').value = dataObj.get("topicsG69") || "";
+      document.getElementById('studentList').value = dataObj.get("students") || "";
+      
+      populateTownships();
+      switchPool(true); 
+      
+      // Enable UI
+      document.getElementById('drawBtn').disabled = false;
+      document.getElementById('drawBtn').innerText = "Spin Wheel";
+      document.getElementById('newBtn').disabled = false;
+      
+    } catch (error) {
+      console.error("Cloud Connection Error:", error);
+      alert("Failed to connect to the cloud database. Check your internet connection.");
+      document.getElementById('drawBtn').innerText = "Connection Error";
+    }
   }
 
+  async function saveCloudData() {
+    if (!cloudConfigId) return;
+    const btn = document.getElementById('saveApplyBtn');
+    if (btn) btn.innerText = "☁ Saving...";
+    
+    try {
+      const query = new Parse.Query("ContestData");
+      const dataObj = await query.get(cloudConfigId);
+      
+      dataObj.set("topicsG15", document.getElementById('topicListG15').value);
+      dataObj.set("topicsG69", document.getElementById('topicListG69').value);
+      dataObj.set("students", document.getElementById('studentList').value);
+      
+      await dataObj.save();
+      
+      // Refresh local UI without reloading page
+      let currentTs = document.getElementById('townshipSelect').value;
+      let currentStudent = document.getElementById('studentSelect').value;
+      
+      populateTownships();
+      switchPool(true);
+      
+      document.getElementById('townshipSelect').value = currentTs;
+      populateStudentDropdown();
+      if(document.querySelector(`#studentSelect option[value="${currentStudent}"]`)) {
+        document.getElementById('studentSelect').value = currentStudent;
+      }
+      
+      if (btn) btn.innerText = "☁ Save & Apply Data";
+      alert("Cloud database updated successfully!");
+    } catch (error) {
+      console.error("Save Error:", error);
+      alert("Failed to save to cloud.");
+      if (btn) btn.innerText = "☁ Save & Apply Data";
+    }
+  }
+
+  // Getting arrays directly from the TextAreas which are synced with the cloud
+  function getArrayFromTextArea(elementId) {
+    return document.getElementById(elementId).value.split('\n').map(t => t.trim()).filter(t => t !== '');
+  }
+
+  // ---- Password Security System ----
+  let passActionTarget = null;
+  function openPasswordModal(action) {
+    passActionTarget = action;
+    document.getElementById('adminPassword').value = '';
+    document.getElementById('passwordModal').style.display = 'flex';
+    document.getElementById('adminPassword').focus();
+  }
+  function closePasswordModal() { document.getElementById('passwordModal').style.display = 'none'; }
+  function handlePassEnter(e) { if(e.key === 'Enter') submitPassword(); }
+  
+  async function submitPassword() {
+    const pass = document.getElementById('adminPassword').value;
+    if (pass === "1123") {
+      closePasswordModal();
+      if (passActionTarget === 'admin') {
+        document.getElementById('adminModal').style.display = 'flex';
+      } else if (passActionTarget === 'reset') {
+        let confirmWord = prompt("WARNING: This permanently deletes ALL topics, students, and history from the cloud database.\nType 'RESET' in all caps to confirm:");
+        if (confirmWord === "RESET") {
+          try {
+            // Delete History
+            const histQuery = new Parse.Query("DrawHistory");
+            histQuery.limit(1000);
+            const allHist = await histQuery.find();
+            await Parse.Object.destroyAll(allHist);
+            
+            // Reset Data
+            const query = new Parse.Query("ContestData");
+            const dataObj = await query.get(cloudConfigId);
+            dataObj.set("topicsG15", defaultTopicsG15.join('\n'));
+            dataObj.set("topicsG69", defaultTopicsG69.join('\n'));
+            dataObj.set("students", "");
+            await dataObj.save();
+            
+            alert("Cloud database completely wiped and reset.");
+            location.reload();
+          } catch(e) {
+            alert("Error wiping cloud data.");
+            console.error(e);
+          }
+        } else {
+          alert("Factory reset cancelled.");
+        }
+      }
+    } else {
+      alert("Access Denied: Incorrect Password");
+      document.getElementById('adminPassword').value = '';
+    }
+  }
+
+  // ---- Data Management (Import & Export JSON) ----
+  async function importJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+      try {
+        const data = JSON.parse(e.target.result);
+        let importedList = [];
+        data.forEach(student => {
+          if(student.township && student.name) importedList.push(`${student.township}: ${student.name}`);
+        });
+        if (importedList.length === 0) { alert("No valid students found."); return; }
+        
+        const currentVal = document.getElementById('studentList').value.trim();
+        const newVal = currentVal ? currentVal + '\n' + importedList.join('\n') : importedList.join('\n');
+        document.getElementById('studentList').value = newVal;
+        
+        await saveCloudData();
+      } catch (err) { alert("Error reading file."); }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  }
+
+  function exportStudentsJSON() {
+    let lines = getArrayFromTextArea('studentList');
+    let jsonArr = [];
+    lines.forEach((line, index) => {
+      if (line.includes(':')) {
+        let parts = line.split(':');
+        jsonArr.push({ id: "id_" + index, name: parts[1].trim(), township: parts[0].trim() });
+      }
+    });
+    
+    if (jsonArr.length === 0) { alert("No valid students to export."); return; }
+    const blob = new Blob([JSON.stringify(jsonArr, null, 2)], { type: 'application/json' });
+    const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
+    link.download = "IPS_Students_Backup.json"; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  }
+
+  // ---- Pool Logic ----
+  function onStudentSelected() {
+    const select = document.getElementById('studentSelect');
+    if (select.selectedIndex <= 0) return;
+    
+    const opt = select.options[select.selectedIndex];
+    const name = opt.dataset.name;
+    
+    const match = name.match(/\(G\s*(\d+)\)/i);
+    if (match) {
+      const grade = parseInt(match[1]);
+      const targetPool = (grade >= 1 && grade <= 5) ? 'G1-5' : 'G6-9';
+      
+      const poolSelect = document.getElementById('poolSelect');
+      if (poolSelect.value !== targetPool) {
+        poolSelect.value = targetPool;
+        switchPool(true); 
+      }
+    }
+  }
+
+  function handleManualPoolSwitch() {
+    const poolSelect = document.getElementById('poolSelect');
+    const studentSelect = document.getElementById('studentSelect');
+    
+    if (studentSelect.selectedIndex > 0) {
+      const opt = studentSelect.options[studentSelect.selectedIndex];
+      const name = opt.dataset.name;
+      const match = name.match(/\(G\s*(\d+)\)/i);
+      
+      if (match) {
+        const grade = parseInt(match[1]);
+        const correctPool = (grade >= 1 && grade <= 5) ? 'G1-5' : 'G6-9';
+        
+        if (poolSelect.value !== correctPool) {
+          if (!confirm(`WARNING: This student is Grade ${grade}. You are forcing them into the ${poolSelect.options[poolSelect.selectedIndex].text}.\n\nAre you sure you want to proceed?`)) {
+            poolSelect.value = previousPool; 
+            return;
+          }
+        }
+      }
+    }
+    switchPool(true);
+  }
+
+  function switchPool(skipWarning = false) {
+    const poolSelect = document.getElementById('poolSelect');
+    previousPool = poolSelect.value;
+    
+    if (poolSelect.value === 'G1-5') masterPool = getArrayFromTextArea('topicListG15');
+    else masterPool = getArrayFromTextArea('topicListG69');
+    
+    currentWheelPool = [...masterPool];
+    
+    const poolName = poolSelect.options[poolSelect.selectedIndex].text;
+    document.getElementById('activePoolBadge').innerText = "Current Pool: " + poolName;
+    drawWheel();
+  }
+
+  // ---- Students & Townships ----
   function getParsedStudents() {
-    let lines = getSavedArray(STORAGE_STUDENTS);
+    let lines = getArrayFromTextArea('studentList');
     let parsed = [];
     lines.forEach(line => {
       if (line.includes(':')) {
         let parts = line.split(':');
         parsed.push({ township: parts[0].trim(), name: parts[1].trim(), raw: line });
-      } else {
-        parsed.push({ township: 'General', name: line, raw: line });
-      }
+      } else { parsed.push({ township: 'General', name: line, raw: line }); }
     });
     return parsed;
   }
@@ -261,13 +537,10 @@
     
     let currentVal = tsSelect.value;
     tsSelect.innerHTML = '<option value="">-- All Townships --</option>';
-    
     townships.forEach(ts => {
       let opt = document.createElement('option');
-      opt.value = ts; opt.innerText = ts;
-      tsSelect.appendChild(opt);
+      opt.value = ts; opt.innerText = ts; tsSelect.appendChild(opt);
     });
-    
     tsSelect.value = currentVal; 
     populateStudentDropdown();
   }
@@ -278,7 +551,6 @@
     const select = document.getElementById('studentSelect');
     
     select.innerHTML = '<option value="">-- Select Student --</option>';
-    
     let filtered = selectedTs ? students.filter(s => s.township === selectedTs) : students;
     
     filtered.forEach(s => {
@@ -291,27 +563,32 @@
     });
   }
 
-  function addStudentOnTheSpot() {
+  async function addStudentOnTheSpot() {
     let ts = prompt("Enter the Township (e.g., Pakokku, Yangon):");
     if (!ts || ts.trim() === "") return;
-    
-    let name = prompt("Enter the Student's Name:");
+    let name = prompt("Enter the Student's Name (Include Grade, e.g. Mg 1 (G5)):");
     if (!name || name.trim() === "") return;
 
     let newEntry = `${ts.trim()}: ${name.trim()}`;
-    let students = getSavedArray(STORAGE_STUDENTS);
-    students.push(newEntry);
+    const studentListEl = document.getElementById('studentList');
     
-    localStorage.setItem(STORAGE_STUDENTS, students.join('\n'));
-    document.getElementById('studentList').value = students.join('\n');
+    const currentVal = studentListEl.value.trim();
+    studentListEl.value = currentVal ? currentVal + '\n' + newEntry : newEntry;
     
-    populateTownships();
+    // Save to cloud immediately
+    document.getElementById('newBtn').disabled = true;
+    document.getElementById('newBtn').innerText = "☁...";
+    await saveCloudData();
+    document.getElementById('newBtn').disabled = false;
+    document.getElementById('newBtn').innerText = "➕ New";
     
     document.getElementById('townshipSelect').value = ts.trim();
     populateStudentDropdown();
     document.getElementById('studentSelect').value = newEntry;
+    onStudentSelected(); 
   }
 
+  // ---- Wheel Drawing & Logic ----
   function drawWheel() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     if (currentWheelPool.length === 0) return;
@@ -338,30 +615,30 @@
     currentAngle += spinVelocity;
     spinVelocity *= 0.94; 
     drawWheel();
-    if (spinVelocity < 0.002) {
-      isSpinning = false; spinVelocity = 0; onSpinStop();
-    } else { requestAnimationFrame(spinStep); }
+    if (spinVelocity < 0.002) { isSpinning = false; spinVelocity = 0; onSpinStop(); } 
+    else { requestAnimationFrame(spinStep); }
   }
 
   function startDrawSequence() {
     const studentDropdown = document.getElementById('studentSelect');
-    if (studentDropdown.selectedIndex <= 0) {
-      alert("Please select a student first!"); return;
-    }
+    if (studentDropdown.selectedIndex <= 0) { alert("Please select a student first!"); return; }
     
     const selectedOpt = studentDropdown.options[studentDropdown.selectedIndex];
     currentStudentName = selectedOpt.dataset.name;
     currentStudentTownship = selectedOpt.dataset.township;
+    
+    const poolDropdown = document.getElementById('poolSelect');
+    currentPoolSelected = poolDropdown.options[poolDropdown.selectedIndex].text;
 
-    masterPool = getSavedArray(STORAGE_TOPICS);
-    if (masterPool.length < 5) { alert(`Pool only has ${masterPool.length} topics. Need at least 5.`); return; }
+    if (masterPool.length < 5) { alert(`The selected pool only has ${masterPool.length} topics. Need at least 5.`); return; }
 
     const nameDisplay = document.getElementById('prominentName');
-    const tsDisplay = document.getElementById('prominentTownship');
+    const detailsDisplay = document.getElementById('prominentDetails');
     nameDisplay.innerText = currentStudentName;
-    tsDisplay.innerText = currentStudentTownship;
+    detailsDisplay.innerText = `${currentStudentTownship}  |  ${currentPoolSelected}`;
+    
     nameDisplay.classList.add('show-anim');
-    tsDisplay.classList.add('show-anim');
+    detailsDisplay.classList.add('show-anim');
 
     currentWheelPool = [...masterPool];
     currentStudentTopics = [];
@@ -371,6 +648,8 @@
     document.getElementById('drawBtn').disabled = true;
     document.getElementById('studentSelect').disabled = true;
     document.getElementById('townshipSelect').disabled = true;
+    document.getElementById('poolSelect').disabled = true;
+    document.getElementById('activePoolBadge').style.display = 'none';
 
     triggerNextSpin();
   }
@@ -403,7 +682,7 @@
     let card = document.createElement('div');
     card.className = `topic-card pos-${positionIndex}`;
     card.innerText = text;
-    document.getElementById('arena').appendChild(card);
+    document.getElementById('wheelWrapper').appendChild(card);
     setTimeout(() => card.classList.add('show'), 20);
   }
 
@@ -412,89 +691,106 @@
     document.getElementById('drawBtn').innerText = "Spin Wheel";
     document.getElementById('studentSelect').disabled = false;
     document.getElementById('townshipSelect').disabled = false;
+    document.getElementById('poolSelect').disabled = false;
+    document.getElementById('activePoolBadge').style.display = 'inline-block';
     
-    saveToHistory(currentStudentName, currentStudentTownship, currentStudentTopics);
+    saveToHistoryCloud(currentStudentName, currentStudentTownship, currentPoolSelected, currentStudentTopics);
     currentWheelPool = [...masterPool];
     drawWheel();
   }
 
-  function saveToHistory(name, township, topics) {
-    let history = JSON.parse(localStorage.getItem(STORAGE_HISTORY)) || [];
-    let timeString = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
-    history.push({ name: name, township: township, time: timeString, topics: topics });
-    localStorage.setItem(STORAGE_HISTORY, JSON.stringify(history));
+  function clearPool() {
+    if (confirm("Clear all textboxes? (You still need to click 'Save & Apply' to update the cloud).")) { 
+      document.getElementById('topicListG15').value = ''; 
+      document.getElementById('topicListG69').value = ''; 
+      document.getElementById('studentList').value = ''; 
+    }
   }
 
-  function openHistory() {
-    const history = JSON.parse(localStorage.getItem(STORAGE_HISTORY)) || [];
+  // ---- Cloud History Functions ----
+  async function saveToHistoryCloud(name, township, pool, topics) {
+    try {
+      const DrawHistory = Parse.Object.extend("DrawHistory");
+      const historyObj = new DrawHistory();
+      let timeString = new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      
+      historyObj.set("name", name);
+      historyObj.set("township", township);
+      historyObj.set("pool", pool);
+      historyObj.set("time", timeString);
+      historyObj.set("topics", topics);
+      
+      await historyObj.save();
+    } catch(e) {
+      console.error("Failed to save history to cloud", e);
+    }
+  }
+
+  async function openHistory() {
+    document.getElementById('historyModal').style.display = 'flex';
+    document.getElementById('historyTitle').innerText = "Draw History (Loading Cloud Data...)";
     const tbody = document.getElementById('historyBody');
     tbody.innerHTML = '';
-    history.slice().reverse().forEach(entry => {
-      let tr = document.createElement('tr');
-      tr.innerHTML = `<td>${entry.time}</td><td>${entry.township}</td><td><b>${entry.name}</b></td>
-                      <td>${entry.topics[0]}</td><td>${entry.topics[1]}</td>
-                      <td>${entry.topics[2]}</td><td>${entry.topics[3]}</td>
-                      <td>${entry.topics[4]}</td>`;
-      tbody.appendChild(tr);
-    });
-    document.getElementById('historyModal').style.display = 'flex';
-  }
-
-  function exportCSV() {
-    let history = JSON.parse(localStorage.getItem(STORAGE_HISTORY)) || [];
-    if(history.length === 0) { alert("History is empty."); return; }
-    let csvContent = "Time,Township,Student Name,Topic 1,Topic 2,Topic 3,Topic 4,Topic 5\n";
-    history.forEach(e => {
-      let row = `"${e.time}","${e.township}","${e.name}",` + e.topics.map(t => `"${t.replace(/"/g, '""')}"`).join(",");
-      csvContent += row + "\n";
-    });
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
-    link.download = "IPS_Contest_History.csv"; document.body.appendChild(link); link.click(); document.body.removeChild(link);
-  }
-
-  function clearHistory() {
-    if(confirm("Delete ALL student history? This cannot be undone.")) {
-      localStorage.removeItem(STORAGE_HISTORY); openHistory(); 
+    
+    try {
+      const query = new Parse.Query("DrawHistory");
+      query.descending("createdAt");
+      query.limit(1000); 
+      const results = await query.find();
+      
+      results.forEach(entry => {
+        let tr = document.createElement('tr');
+        let topics = entry.get("topics") || [];
+        tr.innerHTML = `<td>${entry.get("time")}</td><td>${entry.get("pool")}</td><td>${entry.get("township")}</td><td><b>${entry.get("name")}</b></td>
+                        <td>${topics[0]||""}</td><td>${topics[1]||""}</td>
+                        <td>${topics[2]||""}</td><td>${topics[3]||""}</td>
+                        <td>${topics[4]||""}</td>`;
+        tbody.appendChild(tr);
+      });
+      document.getElementById('historyTitle').innerText = "Draw History (Live Cloud Sync)";
+    } catch(e) {
+      document.getElementById('historyTitle').innerText = "Draw History (Error loading)";
+      console.error(e);
     }
   }
 
-  function globalWipe() {
-    let pass = prompt("Enter Admin Password to initiate factory reset:");
-    if (pass === "1123") {
-      let confirmWord = prompt("WARNING: This deletes ALL topics, students, and history.\nType 'RESET' in all caps to confirm:");
-      if (confirmWord === "RESET") {
-        localStorage.removeItem(STORAGE_TOPICS);
-        localStorage.removeItem(STORAGE_STUDENTS);
-        localStorage.removeItem(STORAGE_HISTORY);
-        alert("All data wiped. The app will now reload.");
-        location.reload();
-      } else {
-        alert("Factory reset cancelled.");
+  async function exportCSV() {
+    try {
+      const query = new Parse.Query("DrawHistory");
+      query.descending("createdAt");
+      query.limit(1000); 
+      const results = await query.find();
+      
+      if(results.length === 0) { alert("History is empty."); return; }
+      
+      let csvContent = "Time,Pool,Township,Student Name,Topic 1,Topic 2,Topic 3,Topic 4,Topic 5\n";
+      results.forEach(e => {
+        let topics = e.get("topics") || [];
+        let row = `"${e.get("time")}","${e.get("pool")}","${e.get("township")}","${e.get("name")}",` + topics.map(t => `"${t.replace(/"/g, '""')}"`).join(",");
+        csvContent += row + "\n";
+      });
+      
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
+      link.download = "IPS_Contest_History_Cloud.csv"; document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    } catch(e) {
+      alert("Failed to export history.");
+    }
+  }
+
+  async function clearHistory() {
+    if(confirm("Delete ALL history directly from the cloud database? This cannot be undone.")) {
+      try {
+        document.getElementById('historyTitle').innerText = "Deleting...";
+        const query = new Parse.Query("DrawHistory");
+        query.limit(1000);
+        const allHist = await query.find();
+        await Parse.Object.destroyAll(allHist);
+        alert("Cloud history completely cleared.");
+        openHistory(); 
+      } catch(e) {
+        alert("Error clearing history.");
       }
-    } else if (pass !== null) {
-      alert("Access Denied.");
-    }
-  }
-
-  function requestAdmin() {
-    if (prompt("Enter Admin Password:") === "1123") { document.getElementById('adminModal').style.display = 'flex'; }
-    else { alert("Access Denied"); }
-  }
-  
-  function autoSaveAdmin() { 
-    localStorage.setItem(STORAGE_TOPICS, document.getElementById('topicList').value);
-    localStorage.setItem(STORAGE_STUDENTS, document.getElementById('studentList').value);
-    populateTownships();
-  }
-  
-  function reloadApp() { autoSaveAdmin(); location.reload(); }
-  
-  function clearPool() {
-    if (confirm("Delete all topics and students?")) { 
-      document.getElementById('topicList').value = ''; 
-      document.getElementById('studentList').value = ''; 
-      autoSaveAdmin(); 
     }
   }
   
