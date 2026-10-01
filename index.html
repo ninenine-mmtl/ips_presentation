@@ -541,21 +541,36 @@
     const obj = new AppData();
     obj.id = parseDocId;
     obj.set("payload", db);
-    obj.save().catch(error => { if (!silent) alert("Error saving data: " + error.message); }); 
+    obj.save().then(() => {
+        if (!silent) showToast("Changes saved successfully!");
+    }).catch(error => { 
+        if (!silent) showToast("Error saving data: " + error.message); 
+    }); 
   }
   
   function pushLog(msg) { db.logs.push({ time: new Date().toLocaleTimeString(), message: msg }); }
 
-  function updatePresence() {
+  // Isolated Presence Update to completely stop Database Race Conditions
+  async function updatePresence() {
     if (!parseDocId) return;
-    if (!db.presence) db.presence = {};
     if (!window.localSessionId) window.localSessionId = genId();
     
     const id = currentUser ? (currentUser.role === 'admin' ? 'admin' : currentUser.id) : 'public_' + window.localSessionId;
     const name = currentUser ? (currentUser.role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name) : 'Public Viewer';
     
-    db.presence[id] = { name: name, time: Date.now() };
-    saveData(true); // Silent save for presence
+    const AppData = Parse.Object.extend("AppData");
+    const query = new Parse.Query(AppData);
+    try {
+        const results = await query.find();
+        if (results.length > 0) {
+            const serverData = results[0].get("payload");
+            if (!serverData.presence) serverData.presence = {};
+            serverData.presence[id] = { name: name, time: Date.now() };
+            results[0].set("payload", serverData);
+            await results[0].save();
+            // Do not sync the rest of the db back here. Let the 3-second fetch cycle do its job!
+        }
+    } catch (e) {}
   }
 
   function updateUI() {
@@ -630,7 +645,7 @@
           updatePresence();
           showView('observerView');
         } else {
-          alert("Incorrect PIN!");
+          showToast("Incorrect PIN!");
         }
       }
     }
@@ -698,7 +713,7 @@
   }
 
   function exportStudents() {
-    if (!db.students || db.students.length === 0) return alert("No students to backup.");
+    if (!db.students || db.students.length === 0) return showToast("No students to backup.");
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db.students));
     const dlAnchorElem = document.createElement('a');
     dlAnchorElem.setAttribute("href", dataStr);
@@ -719,9 +734,8 @@
           db.students = db.students.concat(newStudents);
           pushLog(`System: Admin imported ${imported.length} students.`);
           saveData();
-          alert("Students imported successfully!");
         }
-      } catch (err) { alert("Error reading student file. Invalid format."); }
+      } catch (err) { showToast("Error reading student file. Invalid format."); }
       event.target.value = '';
     };
     reader.readAsText(file);
@@ -734,18 +748,17 @@
     const adminPin = db.settings.adminPin || '0000';
     
     if (!name || !pwd) return;
-    if (!/^\d{4}$/.test(pwd)) return alert("PIN must be exactly 4 digits (0-9).");
-    if (pwd === adminPin) return alert("Cannot use the Admin PIN.");
+    if (!/^\d{4}$/.test(pwd)) return showToast("PIN must be exactly 4 digits (0-9).");
+    if (pwd === adminPin) return showToast("Cannot use the Admin PIN.");
     
     db.judges.push({ id: genId(), name, password: pwd, forbiddenTownships: "" });
     pushLog(`System: Admin created Judge '${name}'.`);
     saveData();
     document.getElementById('judgeName').value = ''; document.getElementById('judgePassword').value = '';
-    alert(`Judge ${name} created!`);
   }
 
   function renderAdminJudgeList() {
-    // Focus Protection: Prevent overwriting inputs if the admin is currently typing inside them!
+    // Focus Protection: Protects admin typing from being overwritten by 3-second auto refresh
     const active = document.activeElement;
     if (active && active.tagName === 'INPUT' && active.id && (active.id.startsWith('jName_') || active.id.startsWith('jPass_') || active.id.startsWith('jForb_'))) {
       return; 
@@ -770,13 +783,12 @@
     const judge = db.judges.find(j => j.id === id);
     if(judge) {
       const newPwd = document.getElementById(`jPass_${id}`).value;
-      if (!/^\d{4}$/.test(newPwd)) return alert("PIN must be exactly 4 digits.");
+      if (!/^\d{4}$/.test(newPwd)) return showToast("PIN must be exactly 4 digits.");
       judge.name = document.getElementById(`jName_${id}`).value;
       judge.password = newPwd;
       judge.forbiddenTownships = document.getElementById(`jForb_${id}`).value;
       pushLog(`System: Admin updated restrictions for Judge '${judge.name}'.`);
       saveData();
-      alert("Judge details updated!");
     }
   }
 
@@ -790,7 +802,7 @@
   }
 
   function exportJudges() {
-    if (!db.judges || db.judges.length === 0) return alert("No judges to backup.");
+    if (!db.judges || db.judges.length === 0) return showToast("No judges to backup.");
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db.judges));
     const dlAnchorElem = document.createElement('a');
     dlAnchorElem.setAttribute("href", dataStr);
@@ -810,9 +822,8 @@
           db.judges = db.judges.concat(imported);
           pushLog(`System: Admin imported ${imported.length} judges.`);
           saveData();
-          alert("Judges imported successfully!");
         }
-      } catch (err) { alert("Error reading judge file. Invalid format."); }
+      } catch (err) { showToast("Error reading judge file. Invalid format."); }
       event.target.value = '';
     };
     reader.readAsText(file);
@@ -825,15 +836,14 @@
     const adminPin = db.settings.adminPin || '0000';
     
     if (!name || !pwd) return;
-    if (!/^\d{4}$/.test(pwd)) return alert("PIN must be exactly 4 digits (0-9).");
-    if (pwd === adminPin) return alert("Cannot use the Admin PIN.");
+    if (!/^\d{4}$/.test(pwd)) return showToast("PIN must be exactly 4 digits (0-9).");
+    if (pwd === adminPin) return showToast("Cannot use the Admin PIN.");
     if (!db.observers) db.observers = [];
     
     db.observers.push({ id: genId(), name, password: pwd });
     pushLog(`System: Admin created Observer '${name}'.`);
     saveData();
     document.getElementById('observerName').value = ''; document.getElementById('observerPassword').value = '';
-    alert(`Observer ${name} created!`);
   }
 
   function renderAdminObserverList() {
@@ -890,7 +900,7 @@
   }
   
   function exportLogs() {
-    if (db.logs.length === 0) return alert("No logs to download.");
+    if (db.logs.length === 0) return showToast("No logs to download.");
     const logStrings = db.logs.map(l => `[${l.time}] ${l.message}`);
     const dataStr = "data:text/plain;charset=utf-8," + encodeURIComponent(logStrings.join('\n'));
     const dlAnchorElem = document.createElement('a');
@@ -940,8 +950,7 @@
         db = JSON.parse(e.target.result); 
         pushLog(`System: Admin restored master database from file.`);
         saveData(); 
-        alert("Database Restored Successfully!"); 
-      } catch (err) { alert("Error reading file."); }
+      } catch (err) { showToast("Error reading file."); }
     };
     reader.readAsText(file);
   }
@@ -964,37 +973,34 @@
           db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin }, logs: [], presence: {} };
           pushLog("System: ALL DATA FACTORY RESET FROM PUBLIC PAGE.");
           saveData();
-          alert("Database has been successfully wiped.");
         }
       }
     } else if (pin !== null) {
-      alert("Access Denied: Incorrect PIN.");
+      showToast("Access Denied: Incorrect PIN.");
     }
   }
 
   /* SECURITY PINS */
   function updateAdminPin() {
     const newPin = document.getElementById('adminNewPin').value;
-    if (!/^\d{4}$/.test(newPin)) return alert("PIN must be exactly 4 digits (0-9).");
+    if (!/^\d{4}$/.test(newPin)) return showToast("PIN must be exactly 4 digits (0-9).");
     db.settings.adminPin = newPin;
     pushLog(`Security: Admin changed the Master Admin PIN.`);
     saveData();
     document.getElementById('adminNewPin').value = '';
-    alert("Admin PIN updated successfully!");
   }
 
   function updateJudgePin() {
     const newPin = document.getElementById('judgeNewPin').value;
     const adminPin = db.settings.adminPin || '0000';
-    if (!/^\d{4}$/.test(newPin)) return alert("PIN must be exactly 4 digits (0-9).");
-    if (newPin === adminPin) return alert("Cannot use the Admin PIN.");
+    if (!/^\d{4}$/.test(newPin)) return showToast("PIN must be exactly 4 digits (0-9).");
+    if (newPin === adminPin) return showToast("Cannot use the Admin PIN.");
     const judge = db.judges.find(j => j.id === currentUser.id);
     if (judge) {
       judge.password = newPin;
       pushLog(`Security: Judge '${judge.name}' changed their PIN.`);
       saveData();
       document.getElementById('judgeNewPin').value = '';
-      alert("Your PIN has been updated!");
     }
   }
 
@@ -1032,14 +1038,14 @@
   }
 
   function submitScore() {
-    if (!db.settings.votingOpen) return alert("Voting is closed!");
+    if (!db.settings.votingOpen) return showToast("Voting is closed!");
     const studentId = document.getElementById('judgeStudentSelect').value;
-    if (!studentId) return alert("Select a student");
+    if (!studentId) return showToast("Select a student");
 
     const student = db.students.find(s => s.id === studentId);
     const judge = db.judges.find(j => j.id === currentUser.id);
     const forbiddenList = (judge && judge.forbiddenTownships) ? judge.forbiddenTownships.split(',').map(s => s.trim().toLowerCase()) : [];
-    if (student && forbiddenList.includes(student.township.trim().toLowerCase())) return alert("Restricted from this township.");
+    if (student && forbiddenList.includes(student.township.trim().toLowerCase())) return showToast("Restricted from this township.");
 
     const pron = Number(document.getElementById('s_pron').value);
     const gram = Number(document.getElementById('s_gram').value);
@@ -1057,7 +1063,6 @@
     
     pushLog(`Scoring: Judge '${judge.name}' ${actionText} for '${student.name}' (${total}/25).`);
     saveData();
-    alert(`Score of ${total}/25 submitted!`);
     
     ['pron','gram','flu','qa','cont','deliv'].forEach(id => document.getElementById(`s_${id}`).value = 0);
     document.getElementById('judgeStudentSelect').value = '';
@@ -1080,7 +1085,7 @@
   }
 
   function editMyScore(studentId) {
-    if (!db.settings.votingOpen) return alert("Voting is closed!");
+    if (!db.settings.votingOpen) return showToast("Voting is closed!");
     const s = db.scores[studentId][currentUser.id];
     document.getElementById('judgeStudentSelect').value = studentId;
     document.getElementById('s_pron').value = s.pron;
