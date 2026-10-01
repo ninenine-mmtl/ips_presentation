@@ -5,9 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IPS English Presentation Live Scoring</title>
 
-<!-- FIREBASE SCRIPTS -->
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<!-- BACK4APP (PARSE) SCRIPTS -->
+<script type="text/javascript" src="https://npmcdn.com/parse/dist/parse.min.js"></script>
 
 <style>
   /* Naval Blue & Yellow Theme */
@@ -371,47 +370,63 @@
 
 <script>
   // ==========================================
-  // INJECTED FIREBASE CONFIG
+  // INJECTED BACK4APP (PARSE) CONFIG
   // ==========================================
-  const firebaseConfig = {
-    apiKey: "AIzaSyB7xsqPMM7HyQlcwteGZZVJJp_3Wt0KVCM",
-    authDomain: "ips-scoring.firebaseapp.com",
-    databaseURL: "https://ips-scoring-default-rtdb.asia-southeast1.firebasedatabase.app",
-    projectId: "ips-scoring",
-    storageBucket: "ips-scoring.firebasestorage.app",
-    messagingSenderId: "469846491683",
-    appId: "1:469846491683:web:50ffd600a34d004b01e796",
-    measurementId: "G-BXZXLJB9S4"
-  };
+  Parse.initialize(
+    "KQHogVKClAE7uofUaEr6IswMkNFXENXFktQSGbrR", // Application ID
+    "2sWSdVYGDXcsy2fWmvSi1FPfE7HzAyvwQw49a8R1"  // JavaScript Key
+  );
+  Parse.serverURL = 'https://parseapi.back4app.com/';
   // ==========================================
-
-  firebase.initializeApp(firebaseConfig);
-  const database = firebase.database();
-  const dbRef = database.ref('ips_scoring_db');
 
   let db = { students: [], judges: [], scores: {}, settings: { votingOpen: true, adminPin: '1123' }, logs: [] };
   let currentUser = null; 
   let expandedRows = new Set(); 
   const genId = () => Math.random().toString(36).substr(2, 9);
   
-  dbRef.on('value', (snapshot) => {
-    const data = snapshot.val();
-    if (data) {
-      db = {
-        students: data.students || [],
-        judges: data.judges || [],
-        scores: data.scores || {},
-        settings: data.settings || { votingOpen: true, adminPin: '1123' },
-        logs: data.logs || []
-      };
-      if(!db.settings.adminPin) db.settings.adminPin = '1123';
-    } else {
-      db = { students: [], judges: [], scores: {}, settings: { votingOpen: true, adminPin: '1123' }, logs: [] };
-    }
-    updateUI();
-  });
+  let parseDocId = null;
 
-  function saveData() { dbRef.set(db).catch(error => alert("Error saving data: " + error.message)); }
+  async function fetchDb() {
+    const AppData = Parse.Object.extend("AppData");
+    const query = new Parse.Query(AppData);
+    try {
+      const results = await query.find();
+      if (results.length > 0) {
+        parseDocId = results[0].id;
+        const data = results[0].get("payload");
+        if (data) {
+          db = {
+            students: data.students || [],
+            judges: data.judges || [],
+            scores: data.scores || {},
+            settings: data.settings || { votingOpen: true, adminPin: '1123' },
+            logs: data.logs || []
+          };
+          if(!db.settings.adminPin) db.settings.adminPin = '1123';
+        }
+      } else {
+        // Initialize the database for the first time
+        db = { students: [], judges: [], scores: {}, settings: { votingOpen: true, adminPin: '1123' }, logs: [] };
+        const newDoc = new AppData();
+        newDoc.set("payload", db);
+        const saved = await newDoc.save();
+        parseDocId = saved.id;
+      }
+      updateUI();
+    } catch (error) {
+      console.error("Back4App connection error: " + error.message);
+    }
+  }
+
+  function saveData() { 
+    if (!parseDocId) return fetchDb().then(saveData);
+    const AppData = Parse.Object.extend("AppData");
+    const obj = new AppData();
+    obj.id = parseDocId;
+    obj.set("payload", db);
+    obj.save().catch(error => alert("Error saving data: " + error.message)); 
+  }
+  
   function pushLog(msg) { db.logs.push({ time: new Date().toLocaleTimeString(), message: msg }); }
 
   function updateUI() {
@@ -875,6 +890,10 @@
       }
     });
   }
+  
+  // Real-time listener alternative using polling to mimic Firebase on('value') without WebSocket setup
+  setInterval(fetchDb, 3000);
+  fetchDb();
 </script>
 </body>
 </html>
