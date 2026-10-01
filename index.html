@@ -10,14 +10,41 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <style>
-  /* Naval Blue & Yellow Theme */
-  body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0A1930; color: #ffffff; margin: 0; padding: 0; }
-  .container { max-width: 1200px; margin: 20px auto; padding: 15px; box-sizing: border-box; }
+  /* Naval Blue & Yellow Theme with Watermark Logo */
+  body { 
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    background-color: #0A1930; 
+    color: #ffffff; 
+    margin: 0; 
+    padding: 0; 
+    position: relative;
+    min-height: 100vh;
+  }
+  
+  /* Background Logo Watermark */
+  body::before {
+    content: "";
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background-image: url('4483.jpg');
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: 50vmin; /* Scales beautifully on both PC and mobile */
+    opacity: 0.15; /* Keeps text readable */
+    z-index: -1;
+    pointer-events: none;
+  }
+
+  .container { max-width: 1200px; margin: 20px auto; padding: 15px; box-sizing: border-box; position: relative; z-index: 1; }
   
   /* Header */
   header { 
-    background: #020C1B; padding: 15px 20px; display: flex; flex-direction: column; 
+    background: rgba(2, 12, 27, 0.95); padding: 15px 20px; display: flex; flex-direction: column; 
     gap: 15px; align-items: center; text-align: center; border-bottom: 3px solid #FFC107; 
+    position: relative; z-index: 2;
   }
   .header-content { display: flex; flex-direction: column; gap: 10px; align-items: center; }
   .header-badges { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
@@ -46,7 +73,7 @@
   .active-view { display: block; }
   
   /* Cards */
-  .card { background: #112240; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #FFC107; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+  .card { background: rgba(17, 34, 64, 0.95); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #FFC107; box-shadow: 0 4px 15px rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
   h2, h3 { margin-top: 0; border-bottom: 1px solid #233554; padding-bottom: 10px; color: #FFC107; }
 
   .card-header-flex { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-bottom: 15px; text-align: center; }
@@ -54,7 +81,7 @@
   
   /* Tables */
   .table-responsive { overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; }
-  table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 0.95rem; min-width: 500px; }
+  table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 0.95rem; min-width: 600px; }
   th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #233554; }
   th { background: #020C1B; color: #FFC107; }
   
@@ -67,7 +94,7 @@
 
   .details-container { padding: 0 !important; border-bottom: 2px solid #FFC107 !important; }
   .details-table { width: 100%; font-size: 0.85rem; background: rgba(255, 193, 7, 0.05); min-width: 100%; }
-  .details-table th { background: rgba(255, 193, 7, 0.15); color: #FFC107; padding: 10px; text-transform: uppercase; }
+  .details-table th { background: rgba(255, 193, 7, 0.15); color: #FFC107; padding: 10px; text-transform: uppercase; font-size: 0.75rem; }
   .details-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
 
   /* Scoring Grid */
@@ -243,7 +270,7 @@
       <div class="table-responsive">
         <table>
           <thead>
-            <tr><th>Student</th><th>Judge</th><th>Scores (P,G,F,Q,C,D)</th><th>Total</th></tr>
+            <tr><th>Student</th><th>Judge</th><th>Scores (Pronunciation, Grammar, Fluency, Q&A, Content, Delivery)</th><th>Total</th></tr>
           </thead>
           <tbody id="adminVotingHistory"></tbody>
         </table>
@@ -341,7 +368,7 @@
 
 <script>
   // ==========================================
-  // 🔴 PASTE YOUR FIREBASE CONFIG HERE 🔴
+  // INJECTED FIREBASE CONFIG
   // ==========================================
   const firebaseConfig = {
     apiKey: "AIzaSyB7xsqPMM7HyQlcwteGZZVJJp_3Wt0KVCM",
@@ -355,7 +382,6 @@
   };
   // ==========================================
 
-  // Initialize Firebase
   firebase.initializeApp(firebaseConfig);
   const database = firebase.database();
   const dbRef = database.ref('ips_scoring_db');
@@ -607,7 +633,7 @@
           tbody.innerHTML += `<tr>
             <td>${student.name}</td>
             <td>${judge ? judge.name : 'Unknown Judge'}</td>
-            <td style="font-size:0.85rem; color:#ccc;">P:${s.pron}, G:${s.gram}, F:${s.flu}, Q:${s.qa}, C:${s.cont}, D:${s.deliv}</td>
+            <td style="font-size:0.85rem; color:#ccc;">Pronunciation: ${s.pron}, Grammar: ${s.gram}, Fluency: ${s.flu}, Q&A: ${s.qa}, Content: ${s.cont}, Delivery: ${s.deliv}</td>
             <td style="font-weight:bold; color:#FFC107;">${s.total} / 25</td>
           </tr>`;
         });
@@ -762,7 +788,7 @@
         tbody.innerHTML += `<tr>
           <td>${student.name}</td>
           <td style="font-weight:bold; color:#FFC107;">${s.total} / 25</td>
-          <td style="font-size:0.8rem; color:#aaa;">P:${s.pron} G:${s.gram} F:${s.flu} Q:${s.qa} C:${s.cont} D:${s.deliv}</td>
+          <td style="font-size:0.8rem; color:#aaa;">Pronunciation: ${s.pron}, Grammar: ${s.gram}, Fluency: ${s.flu}, Q&A: ${s.qa}, Content: ${s.cont}, Delivery: ${s.deliv}</td>
           <td><button onclick="editMyScore('${student.id}')" ${!db.settings.votingOpen ? 'disabled' : ''}>Edit</button></td>
         </tr>`;
       }
@@ -824,7 +850,7 @@
       if (isExpanded) {
         let detailsHTML = `<tr><td colspan="4" class="details-container">
           <table class="details-table">
-            <thead><tr><th>Judge</th><th>Pron (5)</th><th>Gram (3)</th><th>Flu (4)</th><th>Q&A (6)</th><th>Cont (3)</th><th>Deliv (4)</th><th>Total (25)</th></tr></thead>
+            <thead><tr><th>Judge</th><th>Pronunciation (5)</th><th>Grammar (3)</th><th>Fluency (4)</th><th>Q&A (6)</th><th>Content (3)</th><th>Delivery (4)</th><th>Total (25)</th></tr></thead>
             <tbody>`;
         
         if (r.scoresObj && Object.keys(r.scoresObj).length > 0) {
