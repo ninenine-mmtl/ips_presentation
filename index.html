@@ -10,43 +10,42 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
 <style>
-  /* Naval Blue & Yellow Theme with Watermark Logo */
+  /* Naval Blue & Yellow Theme */
   body { 
     font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
     background-color: #0A1930; 
     color: #ffffff; 
     margin: 0; 
     padding: 0; 
-    position: relative;
     min-height: 100vh;
   }
   
-  /* Background Logo Watermark */
-  body::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-image: url('4483.jpg');
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: 50vmin; /* Scales beautifully on both PC and mobile */
-    opacity: 0.15; /* Keeps text readable */
-    z-index: -1;
-    pointer-events: none;
-  }
-
-  .container { max-width: 1200px; margin: 20px auto; padding: 15px; box-sizing: border-box; position: relative; z-index: 1; }
+  .container { max-width: 1200px; margin: 20px auto; padding: 15px; box-sizing: border-box; }
   
-  /* Header */
+  /* Header & Logo */
   header { 
     background: rgba(2, 12, 27, 0.95); padding: 15px 20px; display: flex; flex-direction: column; 
     gap: 15px; align-items: center; text-align: center; border-bottom: 3px solid #FFC107; 
-    position: relative; z-index: 2;
   }
   .header-content { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+  
+  .header-title-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+  }
+  
+  .header-logo {
+    height: 65px;
+    width: 65px;
+    border-radius: 50%;
+    border: 2px solid #FFC107;
+    object-fit: contain;
+    background: white;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+  }
+
   .header-badges { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
   .header-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%; }
   
@@ -115,6 +114,7 @@
   @media(min-width: 768px) {
     header { flex-direction: row; justify-content: space-between; text-align: left; }
     .header-content { flex-direction: row; align-items: center; }
+    .header-title-container { flex-direction: row; }
     .header-actions { width: auto; justify-content: flex-end; }
     h1 { font-size: 1.8rem; }
     .card-header-flex { flex-direction: row; justify-content: space-between; margin-bottom: 10px; }
@@ -128,7 +128,10 @@
 
 <header>
   <div class="header-content">
-    <h1>IPS English Presentation Competition</h1>
+    <div class="header-title-container">
+      <img src="4483.jpg" alt="IPS Logo" class="header-logo">
+      <h1>IPS English Presentation Competition</h1>
+    </div>
     <div class="header-badges">
       <span id="globalVotingStatus" class="status-badge"></span>
       <span id="connectionStatus">● Connected Live</span>
