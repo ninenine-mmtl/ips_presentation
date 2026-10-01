@@ -109,10 +109,10 @@
   .log-list li { padding: 8px 0; border-bottom: 1px dashed #233554; }
   .log-timestamp { color: #FFC107; margin-right: 10px; }
 
-  /* Slide-in Toast Notifications - Slowed down to 1.5s as requested */
+  /* Slide-in Toast Notifications - Faster & Snappier */
   #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
   .toast { background: rgba(17, 34, 64, 0.95); border-left: 4px solid #FFC107; color: white; padding: 15px 20px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 0.9rem; 
-           animation: slideIn 1.5s ease-out forwards, fadeOut 1.5s 5s ease-in forwards; pointer-events: auto; }
+           animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards, fadeOut 0.4s 4s ease-in forwards; pointer-events: auto; }
   @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
   @keyframes fadeOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
 
@@ -275,15 +275,15 @@
       <div class="card-header-flex">
         <h3 style="border:none; margin:0; font-size: 1.3rem;">Manage Judges & Restrictions</h3>
         <div style="display: flex; gap: 10px;">
-          <button onclick="exportJudges()">⬇️ Backup Judges</button>
+          <button onclick="exportJudges()">⬇️️ Backup Judges</button>
           <button onclick="document.getElementById('judgeFileInput').click()">⬆️ Import Judges</button>
           <input type="file" id="judgeFileInput" accept=".json" style="display: none;" onchange="importJudges(event)">
         </div>
       </div>
-      <p style="font-size:0.9rem; color:#ccc;">Check the boxes to forbid a judge from voting for specific branches.</p>
+      <p style="font-size:0.9rem; color:#ccc;">Check the boxes to forbid a judge from voting for specific branches. (Auto-saves instantly)</p>
       <div class="table-responsive">
         <table>
-          <thead><tr><th>Name</th><th>PIN (4-Digits)</th><th>Forbidden Townships (Auto-Generated)</th><th>Actions</th></tr></thead>
+          <thead><tr><th>Name</th><th>PIN (4-Digits)</th><th>Forbidden Townships (Checkboxes)</th><th>Actions</th></tr></thead>
           <tbody id="adminJudgeList"></tbody>
         </table>
       </div>
@@ -493,6 +493,8 @@
   let forceStudentRender = true;
   let forceJudgeRender = true;
   let forceObserverRender = true;
+  let forceJudgeStudentRender = true;
+  window.isSaving = false;
 
   // Toast Notification Logic
   function createToastContainer() {
@@ -511,14 +513,18 @@
     toast.className = 'toast';
     toast.innerText = message;
     container.appendChild(toast);
-    setTimeout(() => toast.remove(), 6000);
+    setTimeout(() => toast.remove(), 4500);
   }
 
   async function fetchDb() {
+    if (window.isSaving) return; // Prevent overwriting during manual saves
+
     const AppData = Parse.Object.extend("AppData");
     const query = new Parse.Query(AppData);
     try {
       const results = await query.find();
+      if (window.isSaving) return; 
+
       if (results.length > 0) {
         parseDocId = results[0].id;
         const data = results[0].get("payload");
@@ -548,25 +554,30 @@
   }
 
   async function saveData(silent = false) { 
+    window.isSaving = true; 
     if (!parseDocId) {
         await fetchDb();
     }
     const AppData = Parse.Object.extend("AppData");
     const obj = new AppData();
     obj.id = parseDocId;
-    obj.set("payload", db);
+    
+    // CRITICAL BUG FIX: Deep clone forces Parse SDK to send the actual update to the server!
+    obj.set("payload", JSON.parse(JSON.stringify(db)));
     
     try {
         await obj.save();
+        setTimeout(() => { window.isSaving = false; }, 500);
         if (!silent) showToast("Changes saved successfully!");
     } catch (error) {
+        window.isSaving = false;
         if (!silent) showToast("Error saving data: " + error.message); 
     }
   }
   
   function pushLog(msg) { db.logs.push({ time: new Date().toLocaleTimeString(), message: msg }); }
 
-  // Updates presence ONLY upon login to prevent background race condition saving.
+  // Updates presence ONLY upon login to prevent background race conditions.
   function updatePresenceOnLogin() {
     if (!currentUser) return;
     const id = (currentUser.role === 'admin' ? 'admin' : currentUser.id);
@@ -633,6 +644,7 @@
         pushLog(`Access: Judge ${judge.name} logged in.`);
         showToast(`Login Alert: Judge ${judge.name} has joined the session.`);
         
+        forceJudgeStudentRender = true;
         updatePresenceOnLogin();
         showView('judgeView');
       } else {
@@ -692,7 +704,7 @@
     if (!name || !twp) return;
     db.students.push({ id: genId(), name, township: twp });
     pushLog(`System: Admin added student '${name}'.`);
-    forceStudentRender = forceJudgeRender = true; 
+    forceStudentRender = forceJudgeRender = forceJudgeStudentRender = true; 
     saveData();
     document.getElementById('studentName').value = ''; document.getElementById('studentTownship').value = '';
   }
@@ -703,7 +715,7 @@
       db.students = db.students.filter(s => s.id !== id);
       delete db.scores[id];
       pushLog(`System: Admin deleted student '${student.name}'.`);
-      forceStudentRender = forceJudgeRender = true;
+      forceStudentRender = forceJudgeRender = forceJudgeStudentRender = true;
       saveData();
     }
   }
@@ -754,7 +766,7 @@
           const newStudents = imported.map(s => ({ id: genId(), name: s.name, township: s.township }));
           db.students = db.students.concat(newStudents);
           pushLog(`System: Admin imported ${imported.length} students.`);
-          forceStudentRender = forceJudgeRender = true;
+          forceStudentRender = forceJudgeRender = forceJudgeStudentRender = true;
           saveData();
         }
       } catch (err) { showToast("Error reading student file. Invalid format."); }
@@ -782,7 +794,6 @@
 
   function renderAdminJudgeList() {
     const newHash = JSON.stringify(db.judges) + JSON.stringify(db.students);
-    // Hash check: if the database hasn't structurally changed, it skips rendering to protect your clicking/typing.
     if (lastJudgeHash === newHash && !forceJudgeRender) return;
     lastJudgeHash = newHash;
     forceJudgeRender = false;
@@ -796,29 +807,41 @@
     db.judges.forEach(j => {
       let currentForb = (j.forbiddenTownships || '').split(',').map(s => s.trim().toLowerCase());
       
-      // Builds responsive Checkboxes for each unique township.
+      // Build auto-saving Checkboxes for each unique township. No text typing required.
       let checkboxesHTML = allTownships.map(t => {
         let isChecked = currentForb.includes(t.toLowerCase()) ? 'checked' : '';
         return `<label style="display:inline-flex; align-items:center; margin-right:10px; margin-bottom:5px; font-size:0.85rem; color:#ccc; cursor:pointer;">
-                  <input type="checkbox" class="jForbCheck_${j.id}" value="${t}" ${isChecked} style="margin:0 5px 0 0; width:auto; cursor:pointer;"> ${t}
+                  <input type="checkbox" class="jForbCheck_${j.id}" value="${t}" ${isChecked} onchange="autoSaveForb('${j.id}')" style="margin:0 5px 0 0; width:auto; cursor:pointer;"> ${t}
                 </label>`;
       }).join('');
       
       if (allTownships.length === 0) checkboxesHTML = `<span style="font-size:0.8rem; color:#777;">Add students first to generate checklist</span>`;
 
       tbody.innerHTML += `<tr>
-        <td><input type="text" id="jName_${j.id}" class="table-input" value="${j.name}"></td>
+        <td><input type="text" id="jName_${j.id}" class="table-input" value="${j.name}" style="width:120px;"></td>
         <td><input type="password" id="jPass_${j.id}" class="table-input" value="${j.password}" maxlength="4" style="width:70px;"></td>
         <td><div style="display:flex; flex-wrap:wrap; max-width: 300px; padding: 5px 0;">${checkboxesHTML}</div></td>
         <td style="white-space: nowrap;">
-          <button onclick="updateJudge('${j.id}')">Save</button>
+          <button onclick="updateJudgeProfile('${j.id}')">Save Profile</button>
           <button class="danger-btn" onclick="removeJudge('${j.id}')">Delete</button>
         </td>
       </tr>`;
     });
   }
 
-  function updateJudge(id) {
+  // Instantly saves checkbox clicks in the background without needing a Save button!
+  function autoSaveForb(id) {
+    const judge = db.judges.find(j => j.id === id);
+    if (judge) {
+      const checkedBoxes = Array.from(document.querySelectorAll(`.jForbCheck_${id}:checked`)).map(cb => cb.value);
+      judge.forbiddenTownships = checkedBoxes.join(', ');
+      pushLog(`System: Admin updated restrictions for Judge '${judge.name}'.`);
+      forceJudgeRender = true;
+      saveData(true); 
+    }
+  }
+
+  function updateJudgeProfile(id) {
     const judge = db.judges.find(j => j.id === id);
     if(judge) {
       const newPwd = document.getElementById(`jPass_${id}`).value;
@@ -827,12 +850,8 @@
       judge.name = document.getElementById(`jName_${id}`).value;
       judge.password = newPwd;
       
-      // Gathers all clicked checkboxes for this specific judge instantly
-      const checkedBoxes = Array.from(document.querySelectorAll(`.jForbCheck_${id}:checked`)).map(cb => cb.value);
-      judge.forbiddenTownships = checkedBoxes.join(', ');
-
-      pushLog(`System: Admin updated restrictions for Judge '${judge.name}'.`);
-      forceJudgeRender = true; // Tells the system to officially lock in the new look
+      pushLog(`System: Admin updated Judge '${judge.name}'.`);
+      forceJudgeRender = true; 
       saveData();
     }
   }
@@ -1017,7 +1036,7 @@
       try { 
         db = JSON.parse(e.target.result); 
         pushLog(`System: Admin restored master database from file.`);
-        forceStudentRender = forceJudgeRender = forceObserverRender = true;
+        forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
         saveData(); 
       } catch (err) { showToast("Error reading file."); }
     };
@@ -1028,7 +1047,7 @@
     if (confirm("WARNING: Deletes all data globally from the cloud! Are you sure?")) {
       db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000' }, logs: [], presence: {} };
       pushLog("System: ALL DATA FACTORY RESET BY ADMIN.");
-      forceStudentRender = forceJudgeRender = forceObserverRender = true;
+      forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
       saveData();
     }
   }
@@ -1042,7 +1061,7 @@
         if (confirm("FINAL WARNING: Click OK to factory reset the entire database. This cannot be undone.")) {
           db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin }, logs: [], presence: {} };
           pushLog("System: ALL DATA FACTORY RESET FROM PUBLIC PAGE.");
-          forceStudentRender = forceJudgeRender = forceObserverRender = true;
+          forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
           saveData();
         }
       }
@@ -1077,12 +1096,15 @@
 
   /* JUDGE SCORING LOGIC */
   function populateJudgeStudents() {
+    if (!currentUser || currentUser.role !== 'judge') return;
+
     const judge = db.judges.find(j => j.id === currentUser.id);
     
-    // HASH LOCK for the Judge Dropdown: 100% Prevents flashing every 3 seconds!
+    // HASH LOCK: Prevents the dropdown from repeatedly flashing!
     const newHash = JSON.stringify(db.students) + (judge ? judge.forbiddenTownships : "");
-    if (lastJudgeStudentHash === newHash) return; 
+    if (lastJudgeStudentHash === newHash && !forceJudgeStudentRender) return; 
     lastJudgeStudentHash = newHash;
+    forceJudgeStudentRender = false;
 
     const select = document.getElementById('judgeStudentSelect');
     const currentVal = select.value;
@@ -1177,13 +1199,13 @@
   /* PUBLIC LEADERBOARD */
   function toggleRowDetails(studentId) {
     if (expandedRows.has(studentId)) expandedRows.delete(studentId); else expandedRows.add(studentId);
-    lastLeaderboardHash = ""; // Force rebuild on click
+    lastLeaderboardHash = ""; 
     renderLeaderboard();
   }
 
   function toggleAllDetails() {
     if (expandedRows.size > 0) expandedRows.clear(); else db.students.forEach(s => expandedRows.add(s.id));
-    lastLeaderboardHash = ""; // Force rebuild on click
+    lastLeaderboardHash = ""; 
     renderLeaderboard();
   }
 
@@ -1249,7 +1271,8 @@
   setInterval(fetchDb, 3000);
   fetchDb();
 
-  // 30-Second Viewer Notification (Read-Only)
+  // 30-Second Viewer Notification (SMART POP-UP)
+  let lastViewerMsg = "";
   setInterval(() => {
     const now = Date.now();
     let count = 0;
@@ -1275,7 +1298,11 @@
        msg += ` Logged in: ${observers.join(', ')}.`;
     }
     
-    showToast(msg);
+    // ONLY show the popup if the status has actually changed!
+    if (msg !== lastViewerMsg) {
+        showToast(msg);
+        lastViewerMsg = msg;
+    }
   }, 30000);
 
 </script>
