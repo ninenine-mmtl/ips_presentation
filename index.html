@@ -109,7 +109,7 @@
   .log-list li { padding: 8px 0; border-bottom: 1px dashed #233554; }
   .log-timestamp { color: #FFC107; margin-right: 10px; }
 
-  /* Slide-in Toast Notifications - Faster & Snappier */
+  /* Slide-in Toast Notifications */
   #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
   .toast { background: rgba(17, 34, 64, 0.95); border-left: 4px solid #FFC107; color: white; padding: 15px 20px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 0.9rem; 
            animation: slideIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards, fadeOut 0.4s 4s ease-in forwards; pointer-events: auto; }
@@ -275,12 +275,12 @@
       <div class="card-header-flex">
         <h3 style="border:none; margin:0; font-size: 1.3rem;">Manage Judges & Restrictions</h3>
         <div style="display: flex; gap: 10px;">
-          <button onclick="exportJudges()">⬇️️ Backup Judges</button>
+          <button onclick="exportJudges()">⬇️ Backup Judges</button>
           <button onclick="document.getElementById('judgeFileInput').click()">⬆️ Import Judges</button>
           <input type="file" id="judgeFileInput" accept=".json" style="display: none;" onchange="importJudges(event)">
         </div>
       </div>
-      <p style="font-size:0.9rem; color:#ccc;">Check the boxes to forbid a judge from voting for specific branches. (Auto-saves instantly)</p>
+      <p style="font-size:0.9rem; color:#ccc;">Check the boxes and click <b>Save Profile</b> to lock in restrictions.</p>
       <div class="table-responsive">
         <table>
           <thead><tr><th>Name</th><th>PIN (4-Digits)</th><th>Forbidden Townships (Checkboxes)</th><th>Actions</th></tr></thead>
@@ -476,7 +476,7 @@
   Parse.serverURL = 'https://parseapi.back4app.com/';
   // ==========================================
 
-  let db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [], presence: {} };
+  let db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [] };
   let currentUser = null; 
   let expandedRows = new Set(); 
   const genId = () => Math.random().toString(36).substr(2, 9);
@@ -517,7 +517,7 @@
   }
 
   async function fetchDb() {
-    if (window.isSaving) return; // Prevent overwriting during manual saves
+    if (window.isSaving) return; 
 
     const AppData = Parse.Object.extend("AppData");
     const query = new Parse.Query(AppData);
@@ -535,13 +535,12 @@
             observers: data.observers || [],
             scores: data.scores || {},
             settings: data.settings || { votingOpen: true, adminPin: '0000' },
-            logs: data.logs || [],
-            presence: data.presence || {}
+            logs: data.logs || []
           };
           if(!db.settings.adminPin) db.settings.adminPin = '0000';
         }
       } else {
-        db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [], presence: {} };
+        db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [] };
         const newDoc = new AppData();
         newDoc.set("payload", db);
         const saved = await newDoc.save();
@@ -562,12 +561,11 @@
     const obj = new AppData();
     obj.id = parseDocId;
     
-    // CRITICAL BUG FIX: Deep clone forces Parse SDK to send the actual update to the server!
     obj.set("payload", JSON.parse(JSON.stringify(db)));
     
     try {
         await obj.save();
-        setTimeout(() => { window.isSaving = false; }, 500);
+        window.isSaving = false;
         if (!silent) showToast("Changes saved successfully!");
     } catch (error) {
         window.isSaving = false;
@@ -577,15 +575,63 @@
   
   function pushLog(msg) { db.logs.push({ time: new Date().toLocaleTimeString(), message: msg }); }
 
-  // Updates presence ONLY upon login to prevent background race conditions.
-  function updatePresenceOnLogin() {
+  /* ============================================================== */
+  /* ISOLATED PRESENCE TRACKER - Solves the Reset/Disappearing Bug! */
+  /* ============================================================== */
+  async function pingPresence() {
     if (!currentUser) return;
-    const id = (currentUser.role === 'admin' ? 'admin' : currentUser.id);
-    const name = (currentUser.role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name);
-    if (!db.presence) db.presence = {};
-    db.presence[id] = { name: name, time: Date.now() };
-    saveData(true); 
+    const role = currentUser.role;
+    const name = (role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name);
+
+    const Presence = Parse.Object.extend("PresenceTracker");
+    const query = new Parse.Query(Presence);
+    query.equalTo("userName", name);
+    try {
+        let pObj;
+        const results = await query.find();
+        if (results.length > 0) {
+            pObj = results[0];
+        } else {
+            pObj = new Presence();
+            pObj.set("userName", name);
+            pObj.set("role", role);
+        }
+        pObj.set("lastActive", Date.now());
+        await pObj.save(); // Saves safely without touching the Scores/Students database!
+    } catch(e) { console.log(e) }
   }
+
+  let lastViewerMsg = "";
+  async function checkViewers() {
+    const Presence = Parse.Object.extend("PresenceTracker");
+    const query = new Parse.Query(Presence);
+    
+    // Accurately finds anyone who has pinged the server in the last 60 seconds
+    query.greaterThan("lastActive", Date.now() - 60000); 
+    try {
+        const results = await query.find();
+        let count = results.length;
+        let adminWatching = false;
+        let observers = [];
+
+        results.forEach(r => {
+            const role = r.get("role");
+            const name = r.get("userName");
+            if (role === 'admin') adminWatching = true;
+            else if (role === 'observer') observers.push(name);
+        });
+
+        let msg = `👁 ${count} user(s) currently active.`;
+        if (adminWatching) msg += ` Admin is online.`;
+        if (observers.length > 0) msg += ` Logged in: ${observers.join(', ')}.`;
+
+        if (msg !== lastViewerMsg) {
+            showToast(msg);
+            lastViewerMsg = msg;
+        }
+    } catch(e) {}
+  }
+  /* ============================================================== */
 
   function updateUI() {
     renderLeaderboard();
@@ -631,7 +677,7 @@
       pushLog(`Access: Admin (U Nine Nine) logged in.`);
       showToast(`Welcome back, U Nine Nine.`);
       forceStudentRender = forceJudgeRender = forceObserverRender = true;
-      updatePresenceOnLogin();
+      pingPresence();
       showView('adminView');
     } else {
       const judge = db.judges.find(j => j.password === pwd);
@@ -645,7 +691,7 @@
         showToast(`Login Alert: Judge ${judge.name} has joined the session.`);
         
         forceJudgeStudentRender = true;
-        updatePresenceOnLogin();
+        pingPresence();
         showView('judgeView');
       } else {
         const observer = (db.observers || []).find(o => o.password === pwd);
@@ -658,7 +704,7 @@
           pushLog(`Access: Observer ${observer.name} logged in.`);
           showToast(`Login Alert: Observer ${observer.name} is watching.`);
           
-          updatePresenceOnLogin();
+          pingPresence();
           showView('observerView');
         } else {
           showToast("Incorrect PIN!");
@@ -668,11 +714,6 @@
   }
 
   function logout() { 
-    if (currentUser) {
-        const id = (currentUser.role === 'admin' ? 'admin' : currentUser.id);
-        delete db.presence[id];
-        saveData(true); 
-    }
     currentUser = null; 
     document.getElementById('authButtons').style.display = 'block'; 
     document.getElementById('userMenu').style.display = 'none'; 
@@ -801,17 +842,15 @@
     const tbody = document.getElementById('adminJudgeList');
     tbody.innerHTML = '';
     
-    // Automatically extract exact, unique township names directly from the Student database!
     const allTownships = [...new Set(db.students.map(s => s.township.trim()))].filter(Boolean);
 
     db.judges.forEach(j => {
       let currentForb = (j.forbiddenTownships || '').split(',').map(s => s.trim().toLowerCase());
       
-      // Build auto-saving Checkboxes for each unique township. No text typing required.
       let checkboxesHTML = allTownships.map(t => {
         let isChecked = currentForb.includes(t.toLowerCase()) ? 'checked' : '';
         return `<label style="display:inline-flex; align-items:center; margin-right:10px; margin-bottom:5px; font-size:0.85rem; color:#ccc; cursor:pointer;">
-                  <input type="checkbox" class="jForbCheck_${j.id}" value="${t}" ${isChecked} onchange="autoSaveForb('${j.id}')" style="margin:0 5px 0 0; width:auto; cursor:pointer;"> ${t}
+                  <input type="checkbox" class="jForbCheck_${j.id}" value="${t}" ${isChecked} style="margin:0 5px 0 0; width:auto; cursor:pointer;"> ${t}
                 </label>`;
       }).join('');
       
@@ -829,18 +868,6 @@
     });
   }
 
-  // Instantly saves checkbox clicks in the background without needing a Save button!
-  function autoSaveForb(id) {
-    const judge = db.judges.find(j => j.id === id);
-    if (judge) {
-      const checkedBoxes = Array.from(document.querySelectorAll(`.jForbCheck_${id}:checked`)).map(cb => cb.value);
-      judge.forbiddenTownships = checkedBoxes.join(', ');
-      pushLog(`System: Admin updated restrictions for Judge '${judge.name}'.`);
-      forceJudgeRender = true;
-      saveData(true); 
-    }
-  }
-
   function updateJudgeProfile(id) {
     const judge = db.judges.find(j => j.id === id);
     if(judge) {
@@ -850,7 +877,10 @@
       judge.name = document.getElementById(`jName_${id}`).value;
       judge.password = newPwd;
       
-      pushLog(`System: Admin updated Judge '${judge.name}'.`);
+      const checkedBoxes = Array.from(document.querySelectorAll(`.jForbCheck_${id}:checked`)).map(cb => cb.value);
+      judge.forbiddenTownships = checkedBoxes.join(', ');
+
+      pushLog(`System: Admin updated Profile/Restrictions for Judge '${judge.name}'.`);
       forceJudgeRender = true; 
       saveData();
     }
@@ -1045,7 +1075,7 @@
 
   function clearAllData() {
     if (confirm("WARNING: Deletes all data globally from the cloud! Are you sure?")) {
-      db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000' }, logs: [], presence: {} };
+      db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000' }, logs: [] };
       pushLog("System: ALL DATA FACTORY RESET BY ADMIN.");
       forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
       saveData();
@@ -1059,7 +1089,7 @@
     if (pin === adminPin) {
       if (confirm("STEP 2: ALL DATA WILL BE DELETED GLOABLLY. Are you absolutely sure?")) {
         if (confirm("FINAL WARNING: Click OK to factory reset the entire database. This cannot be undone.")) {
-          db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin }, logs: [], presence: {} };
+          db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin }, logs: [] };
           pushLog("System: ALL DATA FACTORY RESET FROM PUBLIC PAGE.");
           forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
           saveData();
@@ -1100,7 +1130,7 @@
 
     const judge = db.judges.find(j => j.id === currentUser.id);
     
-    // HASH LOCK: Prevents the dropdown from repeatedly flashing!
+    // Strict Hash Lock prevents flashing.
     const newHash = JSON.stringify(db.students) + (judge ? judge.forbiddenTownships : "");
     if (lastJudgeStudentHash === newHash && !forceJudgeStudentRender) return; 
     lastJudgeStudentHash = newHash;
@@ -1267,43 +1297,15 @@
     });
   }
   
-  // Real-time listener alternative using polling to mimic Firebase
+  // Real-time Master DB listener
   setInterval(fetchDb, 3000);
   fetchDb();
 
-  // 30-Second Viewer Notification (SMART POP-UP)
-  let lastViewerMsg = "";
-  setInterval(() => {
-    const now = Date.now();
-    let count = 0;
-    let adminWatching = false;
-    let observers = [];
-    
-    if (db.presence) {
-        Object.values(db.presence).forEach(p => {
-            if (now - p.time < 10800000) { // Shows anyone who logged in within the last 3 hours
-                count++;
-                if (p.name === 'U Nine Nine - Pakokku') {
-                    adminWatching = true;
-                } else if (p.name !== 'Public Viewer') {
-                    observers.push(`${p.name}`);
-                }
-            }
-        });
-    }
-    
-    let msg = `👁 ${count} user(s) currently active.`;
-    if (adminWatching) msg += ` Admin is online.`;
-    if (observers.length > 0) {
-       msg += ` Logged in: ${observers.join(', ')}.`;
-    }
-    
-    // ONLY show the popup if the status has actually changed!
-    if (msg !== lastViewerMsg) {
-        showToast(msg);
-        lastViewerMsg = msg;
-    }
-  }, 30000);
+  // Sends isolated heartbeat every 45 seconds so server knows who is online
+  setInterval(pingPresence, 45000);
+
+  // Checks Viewer Tracker every 30 seconds
+  setInterval(checkViewers, 30000);
 
 </script>
 </body>
