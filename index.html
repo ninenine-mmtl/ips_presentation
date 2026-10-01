@@ -186,7 +186,7 @@
     <div class="card" style="max-width: 400px; margin: 0 auto;">
       <h2>System Login</h2>
       <label>Password / PIN:</label>
-      <input type="password" id="loginPassword" placeholder="Enter Admin or Judge PIN" inputmode="numeric">
+      <input type="password" id="loginPassword" placeholder="Enter Admin, Judge, or Observer PIN" inputmode="numeric">
       <button onclick="handleLogin()" style="width: 100%;">Login</button>
       <button onclick="showView('publicView')" class="danger-btn" style="width: 100%; margin-top: 10px; border: none; background: #555;">Back to Leaderboard</button>
     </div>
@@ -234,10 +234,10 @@
         <button onclick="addStudent()">Add Student</button>
       </div>
       <div class="card" style="flex: 1; min-width: 300px;">
-        <h3>Create Judge</h3>
-        <input type="text" id="judgeName" placeholder="Judge Name">
+        <h3>Create Judge / Observer</h3>
+        <input type="text" id="judgeName" placeholder="Name (e.g., Judge Mary or Observer John)">
         <input type="password" id="judgePassword" maxlength="4" placeholder="Set 4-Digit PIN" inputmode="numeric">
-        <button onclick="addJudge()">Create Judge</button>
+        <button onclick="addJudge()">Create Account</button>
       </div>
     </div>
 
@@ -469,14 +469,9 @@
     
     const id = currentUser ? (currentUser.role === 'admin' ? 'admin' : currentUser.id) : 'public_' + window.localSessionId;
     const name = currentUser ? (currentUser.role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name) : 'Public Viewer';
-    let pwd = '';
     
-    if (currentUser && currentUser.role === 'judge') {
-        const j = db.judges.find(x => x.id === currentUser.id);
-        if (j) pwd = j.password;
-    }
-    
-    db.presence[id] = { name: name, time: Date.now(), pwd: pwd };
+    // Removed password from presence payload
+    db.presence[id] = { name: name, time: Date.now() };
     saveData(true); // Silent save for presence
   }
 
@@ -524,10 +519,11 @@
         currentUser = { role: 'judge', id: judge.id, name: judge.name };
         document.getElementById('authButtons').style.display = 'none';
         document.getElementById('userMenu').style.display = 'flex';
-        document.getElementById('welcomeMsg').innerText = `Judge: ${judge.name}`;
+        document.getElementById('welcomeMsg').innerText = `Account: ${judge.name}`;
         
-        pushLog(`Access: ${judge.name} logged in with PIN: ${pwd}.`);
-        showToast(`Observer Login: ${judge.name} logged in (PIN: ${pwd}).`);
+        // Removed PIN broadcast from logs and toast
+        pushLog(`Access: ${judge.name} logged in.`);
+        showToast(`Login Alert: ${judge.name} has joined the session.`);
         
         updatePresence();
         showView('judgeView');
@@ -616,7 +612,7 @@
     reader.readAsText(file);
   }
 
-  /* JUDGE MANAGEMENT */
+  /* JUDGE / OBSERVER MANAGEMENT */
   function addJudge() {
     const name = document.getElementById('judgeName').value;
     const pwd = document.getElementById('judgePassword').value;
@@ -627,10 +623,10 @@
     if (pwd === adminPin) return alert("Cannot use the Admin PIN.");
     
     db.judges.push({ id: genId(), name, password: pwd, forbiddenTownships: "" });
-    pushLog(`System: Admin created Judge/Observer '${name}' with PIN ${pwd}.`);
+    pushLog(`System: Admin created Judge/Observer '${name}'.`);
     saveData();
     document.getElementById('judgeName').value = ''; document.getElementById('judgePassword').value = '';
-    alert(`Judge/Observer ${name} created!`);
+    alert(`Account for ${name} created!`);
   }
 
   function renderAdminJudgeList() {
@@ -657,23 +653,23 @@
       judge.name = document.getElementById(`jName_${id}`).value;
       judge.password = newPwd;
       judge.forbiddenTownships = document.getElementById(`jForb_${id}`).value;
-      pushLog(`System: Admin updated restrictions/settings for Judge '${judge.name}'.`);
+      pushLog(`System: Admin updated restrictions/settings for Judge/Observer '${judge.name}'.`);
       saveData();
-      alert("Judge details updated!");
+      alert("Account details updated!");
     }
   }
 
   function removeJudge(id) {
     const judge = db.judges.find(j => j.id === id);
-    if(judge && confirm("Delete this judge account? Their previously submitted scores will remain.")) {
+    if(judge && confirm("Delete this account? Their previously submitted scores will remain.")) {
       db.judges = db.judges.filter(j => j.id !== id);
-      pushLog(`System: Admin deleted Judge '${judge.name}'.`);
+      pushLog(`System: Admin deleted account '${judge.name}'.`);
       saveData();
     }
   }
 
   function exportJudges() {
-    if (!db.judges || db.judges.length === 0) return alert("No judges to backup.");
+    if (!db.judges || db.judges.length === 0) return alert("No accounts to backup.");
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db.judges));
     const dlAnchorElem = document.createElement('a');
     dlAnchorElem.setAttribute("href", dataStr);
@@ -689,13 +685,13 @@
       try {
         const imported = JSON.parse(e.target.result);
         if (!Array.isArray(imported)) throw new Error("Invalid format");
-        if (confirm(`Import ${imported.length} judges? This will add them to the existing list.`)) {
+        if (confirm(`Import ${imported.length} accounts? This will add them to the existing list.`)) {
           db.judges = db.judges.concat(imported);
-          pushLog(`System: Admin imported ${imported.length} judges.`);
+          pushLog(`System: Admin imported ${imported.length} accounts.`);
           saveData();
-          alert("Judges imported successfully!");
+          alert("Accounts imported successfully!");
         }
-      } catch (err) { alert("Error reading judge file. Invalid format."); }
+      } catch (err) { alert("Error reading file. Invalid format."); }
       event.target.value = '';
     };
     reader.readAsText(file);
@@ -813,7 +809,7 @@
     const judge = db.judges.find(j => j.id === currentUser.id);
     if (judge) {
       judge.password = newPin;
-      pushLog(`Security: Judge '${judge.name}' changed their PIN.`);
+      pushLog(`Security: Account '${judge.name}' changed their PIN.`);
       saveData();
       document.getElementById('judgeNewPin').value = '';
       alert("Your PIN has been updated!");
