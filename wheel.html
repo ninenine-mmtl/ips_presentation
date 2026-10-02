@@ -139,8 +139,17 @@
   th, td { border: 1px solid #444; padding: 8px; text-align: left; }
   th { background: #00d2ff; color: #000; }
   
-  textarea { width: 100%; padding: 10px; font-size: 1rem; border-radius: 8px; box-sizing: border-box; margin-bottom: 10px; background: #222; color: #fff; border: 1px solid #555; }
-  label { font-weight: bold; color: #f39c12; font-size: 0.9rem; display: block; margin-top: 10px; margin-bottom: 5px; }
+  textarea { width: 100%; padding: 10px; font-size: 1rem; border-radius: 8px; box-sizing: border-box; background: #222; color: #fff; border: 1px solid #555; }
+  label { font-weight: bold; color: #f39c12; font-size: 0.9rem; display: block; margin-top: 15px; margin-bottom: 5px; }
+  
+  .pool-settings {
+    background: rgba(255,255,255,0.05); border: 1px solid #333; padding: 10px; border-radius: 8px; margin-bottom: 15px;
+  }
+  .pool-header {
+    display: flex; gap: 10px; margin-bottom: 10px; align-items: center; flex-wrap: wrap;
+  }
+  .pool-header input[type="text"] { flex-grow: 1; min-width: 150px; padding: 8px; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff;}
+  .pool-header input[type="number"] { width: 70px; padding: 8px; border-radius: 4px; border: 1px solid #555; background: #222; color: #fff;}
   
   .action-row { display: flex; gap: 10px; justify-content: space-between; flex-wrap: wrap; margin-top: 15px; }
   .action-btn { flex-grow: 1; padding: 10px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; }
@@ -156,10 +165,9 @@
 <div class="header-section">
   <h1>IPS Presentation Contest</h1>
   <div class="controls">
-    <select id="poolSelect" onchange="handleManualPoolSwitch()">
-      <option value="G1-5">Grades 1-5 Pool</option>
-      <option value="G6-9">Grades 6-9 Pool</option>
-    </select>
+    <!-- Dropdown populated dynamically -->
+    <select id="poolSelect" onchange="handleManualPoolSwitch()"></select>
+    
     <select id="townshipSelect" onchange="populateStudentDropdown()">
       <option value="">-- All Townships --</option>
     </select>
@@ -172,7 +180,7 @@
 </div>
 
 <div class="arena" id="arena">
-  <div id="activePoolBadge">Active Pool: Grades 1-5 Pool</div>
+  <div id="activePoolBadge">Loading...</div>
   <div id="prominentName" class="contestant-name"></div>
   <div id="prominentDetails" class="contestant-details"></div>
   <div class="wheel-wrapper" id="wheelWrapper">
@@ -203,16 +211,40 @@
 <!-- Admin Panel Modal -->
 <div id="adminModal" class="modal">
   <div class="modal-content">
-    <h3>Admin: Manage Cloud Data</h3>
+    <h3 style="margin-top:0;">Admin: Manage Cloud Data</h3>
     
-    <label>Grades 1-5 Topics (One per line):</label>
-    <textarea id="topicListG15" rows="4"></textarea>
+    <!-- Configurable Pool 1 -->
+    <div class="pool-settings">
+      <div class="pool-header">
+        <input type="text" id="p1Name" placeholder="Pool 1 Name (e.g. G1-4)">
+        <span>Min Grade:</span><input type="number" id="p1Min">
+        <span>Max Grade:</span><input type="number" id="p1Max">
+      </div>
+      <textarea id="p1Topics" rows="3" placeholder="Topics (One per line)"></textarea>
+    </div>
 
-    <label>Grades 6-9 Topics (One per line):</label>
-    <textarea id="topicListG69" rows="4"></textarea>
+    <!-- Configurable Pool 2 -->
+    <div class="pool-settings">
+      <div class="pool-header">
+        <input type="text" id="p2Name" placeholder="Pool 2 Name (e.g. G5-6)">
+        <span>Min Grade:</span><input type="number" id="p2Min">
+        <span>Max Grade:</span><input type="number" id="p2Max">
+      </div>
+      <textarea id="p2Topics" rows="3" placeholder="Topics (One per line)"></textarea>
+    </div>
+
+    <!-- Configurable Pool 3 -->
+    <div class="pool-settings">
+      <div class="pool-header">
+        <input type="text" id="p3Name" placeholder="Pool 3 Name (e.g. G7+)">
+        <span>Min Grade:</span><input type="number" id="p3Min">
+        <span>Max Grade:</span><input type="number" id="p3Max">
+      </div>
+      <textarea id="p3Topics" rows="3" placeholder="Topics (One per line)"></textarea>
+    </div>
     
     <label>Pre-added Students (Format: Township: Student Name). Edit list freely below:</label>
-    <textarea id="studentList" rows="8"></textarea>
+    <textarea id="studentList" rows="6"></textarea>
     
     <input type="file" id="jsonUpload" accept=".json" onchange="importJSON(event)" style="display: none;">
     
@@ -222,7 +254,7 @@
     </div>
     <div class="action-row">
       <button class="action-btn bg-blue" id="saveApplyBtn" onclick="saveCloudData()">☁ Save & Apply Data</button>
-      <button class="action-btn bg-red" onclick="clearPool()">Clear Fields</button>
+      <button class="action-btn bg-red" onclick="clearFields()">Clear Fields</button>
       <button class="action-btn bg-gray" onclick="closeModals()">Close</button>
     </div>
   </div>
@@ -231,7 +263,7 @@
 <!-- History Panel Modal -->
 <div id="historyModal" class="modal">
   <div class="modal-content">
-    <h3 id="historyTitle">Draw History (Loading...)</h3>
+    <h3 id="historyTitle" style="margin-top:0;">Draw History (Loading...)</h3>
     <div style="overflow-x: auto;">
       <table id="historyTable">
         <thead><tr><th>Time</th><th>Pool</th><th>Township</th><th>Student</th><th>Topic 1</th><th>Topic 2</th><th>Topic 3</th><th>Topic 4</th><th>Topic 5</th></tr></thead>
@@ -251,29 +283,25 @@
   Parse.initialize("KQHogVKClAE7uofUaEr6IswMkNFXENXFktQSGbrR", "2sWSdVYGDXcsy2fWmvSi1FPfE7HzAyvwQw49a8R1");
   Parse.serverURL = 'https://parseapi.back4app.com/';
 
-  const defaultTopicsG15 = [
-    "My Favorite Animal", "A Day at the Park", "Why Reading is Good", "My Best Friend",
-    "Saving Water", "My Dream Job", "A Great Holiday", "Healthy Foods",
-    "My Favorite Subject", "Helping Others"
-  ];
-  const defaultTopicsG69 = [
-    "Impact of Social Media", "Climate Change", "AI in Education", "Overcoming Failure", 
-    "Value of Teamwork", "Traditional vs Modern Ed", "Positive Thinking", "Learning English", 
-    "Sports in School", "A Day That Changed Me", "Protecting Environment", "Future of Tech"
+  // Default configuration for the 3 configurable pools
+  const defaultPoolsConfig = [
+    { name: "G1-4 Pool", min: 1, max: 4, topics: ["My Favorite Animal", "A Day at the Park", "Why Reading is Good", "My Best Friend", "Saving Water"] },
+    { name: "G5-6 Pool", min: 5, max: 6, topics: ["My Dream Job", "A Great Holiday", "Healthy Foods", "My Favorite Subject", "Helping Others"] },
+    { name: "G7 and up", min: 7, max: 12, topics: ["Impact of Social Media", "Climate Change", "AI in Education", "Overcoming Failure", "Value of Teamwork"] }
   ];
   
   const colors = ['#e74c3c', '#3498db', '#f1c40f', '#2ecc71', '#9b59b6', '#e67e22', '#1abc9c', '#34495e', '#d35400', '#2980b9'];
 
-  let masterPool = [];
+  let appPools = []; // Array of { name, min, max, topics }
   let currentWheelPool = [];
   let currentStudentTopics = [];
   let currentStudentName = "";
   let currentStudentTownship = "";
   let currentPoolSelected = "";
-  let previousPool = "G1-5";
+  let previousPoolIndex = 0;
   let drawsRemaining = 0;
   
-  let cloudConfigId = null; // Tracks the primary ContestData object
+  let cloudConfigId = null; 
   
   const canvas = document.getElementById("wheelCanvas");
   const ctx = canvas.getContext("2d");
@@ -296,21 +324,44 @@
         // Create initial default database record
         const ContestData = Parse.Object.extend("ContestData");
         dataObj = new ContestData();
-        dataObj.set("topicsG15", defaultTopicsG15.join('\n'));
-        dataObj.set("topicsG69", defaultTopicsG69.join('\n'));
+        dataObj.set("poolsConfig", JSON.stringify(defaultPoolsConfig));
         dataObj.set("students", "");
         await dataObj.save();
       } else {
         dataObj = results[0];
+        // Handle migration if older version lacks poolsConfig
+        if (!dataObj.get("poolsConfig")) {
+          dataObj.set("poolsConfig", JSON.stringify(defaultPoolsConfig));
+          await dataObj.save();
+        }
       }
       
       cloudConfigId = dataObj.id;
-      document.getElementById('topicListG15').value = dataObj.get("topicsG15") || "";
-      document.getElementById('topicListG69').value = dataObj.get("topicsG69") || "";
+      
+      // Parse pools and build UI
+      appPools = JSON.parse(dataObj.get("poolsConfig"));
+      
+      // Fill Admin Panel
+      document.getElementById('p1Name').value = appPools[0].name;
+      document.getElementById('p1Min').value = appPools[0].min;
+      document.getElementById('p1Max').value = appPools[0].max;
+      document.getElementById('p1Topics').value = appPools[0].topics.join('\n');
+      
+      document.getElementById('p2Name').value = appPools[1].name;
+      document.getElementById('p2Min').value = appPools[1].min;
+      document.getElementById('p2Max').value = appPools[1].max;
+      document.getElementById('p2Topics').value = appPools[1].topics.join('\n');
+      
+      document.getElementById('p3Name').value = appPools[2].name;
+      document.getElementById('p3Min').value = appPools[2].min;
+      document.getElementById('p3Max').value = appPools[2].max;
+      document.getElementById('p3Topics').value = appPools[2].topics.join('\n');
+      
       document.getElementById('studentList').value = dataObj.get("students") || "";
       
+      buildPoolDropdown();
       populateTownships();
-      switchPool(true); 
+      switchPool(0); // Load first pool by default
       
       // Enable UI
       document.getElementById('drawBtn').disabled = false;
@@ -324,6 +375,17 @@
     }
   }
 
+  function buildPoolDropdown() {
+    const ps = document.getElementById('poolSelect');
+    ps.innerHTML = '';
+    appPools.forEach((pool, index) => {
+      let opt = document.createElement('option');
+      opt.value = index;
+      opt.innerText = pool.name;
+      ps.appendChild(opt);
+    });
+  }
+
   async function saveCloudData() {
     if (!cloudConfigId) return;
     const btn = document.getElementById('saveApplyBtn');
@@ -333,8 +395,29 @@
       const query = new Parse.Query("ContestData");
       const dataObj = await query.get(cloudConfigId);
       
-      dataObj.set("topicsG15", document.getElementById('topicListG15').value);
-      dataObj.set("topicsG69", document.getElementById('topicListG69').value);
+      // Rebuild the appPools array from inputs
+      appPools = [
+        {
+          name: document.getElementById('p1Name').value,
+          min: parseInt(document.getElementById('p1Min').value),
+          max: parseInt(document.getElementById('p1Max').value),
+          topics: getArrayFromTextArea('p1Topics')
+        },
+        {
+          name: document.getElementById('p2Name').value,
+          min: parseInt(document.getElementById('p2Min').value),
+          max: parseInt(document.getElementById('p2Max').value),
+          topics: getArrayFromTextArea('p2Topics')
+        },
+        {
+          name: document.getElementById('p3Name').value,
+          min: parseInt(document.getElementById('p3Min').value),
+          max: parseInt(document.getElementById('p3Max').value),
+          topics: getArrayFromTextArea('p3Topics')
+        }
+      ];
+      
+      dataObj.set("poolsConfig", JSON.stringify(appPools));
       dataObj.set("students", document.getElementById('studentList').value);
       
       await dataObj.save();
@@ -342,9 +425,14 @@
       // Refresh local UI without reloading page
       let currentTs = document.getElementById('townshipSelect').value;
       let currentStudent = document.getElementById('studentSelect').value;
+      let currentPoolIdx = document.getElementById('poolSelect').value;
       
+      buildPoolDropdown();
       populateTownships();
-      switchPool(true);
+      
+      // Ensure the dropdown preserves the selected index if possible
+      document.getElementById('poolSelect').value = currentPoolIdx || 0;
+      switchPool(document.getElementById('poolSelect').value);
       
       document.getElementById('townshipSelect').value = currentTs;
       populateStudentDropdown();
@@ -361,7 +449,6 @@
     }
   }
 
-  // Getting arrays directly from the TextAreas which are synced with the cloud
   function getArrayFromTextArea(elementId) {
     return document.getElementById(elementId).value.split('\n').map(t => t.trim()).filter(t => t !== '');
   }
@@ -384,7 +471,7 @@
       if (passActionTarget === 'admin') {
         document.getElementById('adminModal').style.display = 'flex';
       } else if (passActionTarget === 'reset') {
-        let confirmWord = prompt("WARNING: This permanently deletes ALL topics, students, and history from the cloud database.\nType 'RESET' in all caps to confirm:");
+        let confirmWord = prompt("WARNING: This permanently deletes ALL config, students, and history from the cloud.\nType 'RESET' in all caps to confirm:");
         if (confirmWord === "RESET") {
           try {
             // Delete History
@@ -396,8 +483,7 @@
             // Reset Data
             const query = new Parse.Query("ContestData");
             const dataObj = await query.get(cloudConfigId);
-            dataObj.set("topicsG15", defaultTopicsG15.join('\n'));
-            dataObj.set("topicsG69", defaultTopicsG69.join('\n'));
+            dataObj.set("poolsConfig", JSON.stringify(defaultPoolsConfig));
             dataObj.set("students", "");
             await dataObj.save();
             
@@ -407,9 +493,7 @@
             alert("Error wiping cloud data.");
             console.error(e);
           }
-        } else {
-          alert("Factory reset cancelled.");
-        }
+        } else { alert("Factory reset cancelled."); }
       }
     } else {
       alert("Access Denied: Incorrect Password");
@@ -422,7 +506,7 @@
     const file = event.target.files[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = async function(e) {
+    reader.onload = function(e) {
       try {
         const data = JSON.parse(e.target.result);
         let importedList = [];
@@ -435,7 +519,7 @@
         const newVal = currentVal ? currentVal + '\n' + importedList.join('\n') : importedList.join('\n');
         document.getElementById('studentList').value = newVal;
         
-        await saveCloudData();
+        alert(`Successfully imported ${importedList.length} students! Click Save & Apply to push to cloud.`);
       } catch (err) { alert("Error reading file."); }
     };
     reader.readAsText(file);
@@ -458,6 +542,15 @@
     link.download = "IPS_Students_Backup.json"; document.body.appendChild(link); link.click(); document.body.removeChild(link);
   }
 
+  function clearFields() {
+    if (confirm("Clear all textboxes? (You still need to click 'Save & Apply' to update the cloud).")) { 
+      document.getElementById('p1Topics').value = ''; 
+      document.getElementById('p2Topics').value = ''; 
+      document.getElementById('p3Topics').value = ''; 
+      document.getElementById('studentList').value = ''; 
+    }
+  }
+
   // ---- Pool Logic ----
   function onStudentSelected() {
     const select = document.getElementById('studentSelect');
@@ -469,18 +562,29 @@
     const match = name.match(/\(G\s*(\d+)\)/i);
     if (match) {
       const grade = parseInt(match[1]);
-      const targetPool = (grade >= 1 && grade <= 5) ? 'G1-5' : 'G6-9';
+      let targetIndex = -1;
       
-      const poolSelect = document.getElementById('poolSelect');
-      if (poolSelect.value !== targetPool) {
-        poolSelect.value = targetPool;
-        switchPool(true); 
+      // Auto-detect correct pool based on configured min/max ranges
+      for(let i=0; i<appPools.length; i++) {
+        if(grade >= appPools[i].min && grade <= appPools[i].max) {
+           targetIndex = i;
+           break;
+        }
+      }
+      
+      if (targetIndex !== -1) {
+        const poolSelect = document.getElementById('poolSelect');
+        if (parseInt(poolSelect.value) !== targetIndex) {
+          poolSelect.value = targetIndex;
+          switchPool(targetIndex); 
+        }
       }
     }
   }
 
   function handleManualPoolSwitch() {
     const poolSelect = document.getElementById('poolSelect');
+    const newIndex = parseInt(poolSelect.value);
     const studentSelect = document.getElementById('studentSelect');
     
     if (studentSelect.selectedIndex > 0) {
@@ -490,30 +594,31 @@
       
       if (match) {
         const grade = parseInt(match[1]);
-        const correctPool = (grade >= 1 && grade <= 5) ? 'G1-5' : 'G6-9';
         
-        if (poolSelect.value !== correctPool) {
-          if (!confirm(`WARNING: This student is Grade ${grade}. You are forcing them into the ${poolSelect.options[poolSelect.selectedIndex].text}.\n\nAre you sure you want to proceed?`)) {
-            poolSelect.value = previousPool; 
+        // Find which pool this grade ACTUALLY belongs to
+        let correctIndex = -1;
+        for(let i=0; i<appPools.length; i++) {
+          if(grade >= appPools[i].min && grade <= appPools[i].max) {
+             correctIndex = i; break;
+          }
+        }
+        
+        if (correctIndex !== -1 && correctIndex !== newIndex) {
+          if (!confirm(`WARNING: This student is Grade ${grade}. You are forcing them into the "${appPools[newIndex].name}" pool.\n\nAre you sure you want to proceed?`)) {
+            poolSelect.value = previousPoolIndex; 
             return;
           }
         }
       }
     }
-    switchPool(true);
+    switchPool(newIndex);
   }
 
-  function switchPool(skipWarning = false) {
-    const poolSelect = document.getElementById('poolSelect');
-    previousPool = poolSelect.value;
-    
-    if (poolSelect.value === 'G1-5') masterPool = getArrayFromTextArea('topicListG15');
-    else masterPool = getArrayFromTextArea('topicListG69');
-    
-    currentWheelPool = [...masterPool];
-    
-    const poolName = poolSelect.options[poolSelect.selectedIndex].text;
-    document.getElementById('activePoolBadge').innerText = "Current Pool: " + poolName;
+  function switchPool(index) {
+    previousPoolIndex = index;
+    currentWheelPool = [...appPools[index].topics];
+    currentPoolSelected = appPools[index].name;
+    document.getElementById('activePoolBadge').innerText = "Current Pool: " + currentPoolSelected;
     drawWheel();
   }
 
@@ -575,7 +680,6 @@
     const currentVal = studentListEl.value.trim();
     studentListEl.value = currentVal ? currentVal + '\n' + newEntry : newEntry;
     
-    // Save to cloud immediately
     document.getElementById('newBtn').disabled = true;
     document.getElementById('newBtn').innerText = "☁...";
     await saveCloudData();
@@ -630,7 +734,7 @@
     const poolDropdown = document.getElementById('poolSelect');
     currentPoolSelected = poolDropdown.options[poolDropdown.selectedIndex].text;
 
-    if (masterPool.length < 5) { alert(`The selected pool only has ${masterPool.length} topics. Need at least 5.`); return; }
+    if (currentWheelPool.length < 5) { alert(`The selected pool only has ${currentWheelPool.length} topics. Need at least 5.`); return; }
 
     const nameDisplay = document.getElementById('prominentName');
     const detailsDisplay = document.getElementById('prominentDetails');
@@ -640,7 +744,6 @@
     nameDisplay.classList.add('show-anim');
     detailsDisplay.classList.add('show-anim');
 
-    currentWheelPool = [...masterPool];
     currentStudentTopics = [];
     drawsRemaining = 5;
     
@@ -695,16 +798,9 @@
     document.getElementById('activePoolBadge').style.display = 'inline-block';
     
     saveToHistoryCloud(currentStudentName, currentStudentTownship, currentPoolSelected, currentStudentTopics);
-    currentWheelPool = [...masterPool];
-    drawWheel();
-  }
-
-  function clearPool() {
-    if (confirm("Clear all textboxes? (You still need to click 'Save & Apply' to update the cloud).")) { 
-      document.getElementById('topicListG15').value = ''; 
-      document.getElementById('topicListG69').value = ''; 
-      document.getElementById('studentList').value = ''; 
-    }
+    
+    // Refresh Wheel to restore used topics
+    switchPool(document.getElementById('poolSelect').value);
   }
 
   // ---- Cloud History Functions ----
@@ -721,9 +817,7 @@
       historyObj.set("topics", topics);
       
       await historyObj.save();
-    } catch(e) {
-      console.error("Failed to save history to cloud", e);
-    }
+    } catch(e) { console.error("Failed to save history", e); }
   }
 
   async function openHistory() {
@@ -750,7 +844,6 @@
       document.getElementById('historyTitle').innerText = "Draw History (Live Cloud Sync)";
     } catch(e) {
       document.getElementById('historyTitle').innerText = "Draw History (Error loading)";
-      console.error(e);
     }
   }
 
@@ -773,9 +866,7 @@
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
       const link = document.createElement("a"); link.href = URL.createObjectURL(blob);
       link.download = "IPS_Contest_History_Cloud.csv"; document.body.appendChild(link); link.click(); document.body.removeChild(link);
-    } catch(e) {
-      alert("Failed to export history.");
-    }
+    } catch(e) { alert("Failed to export history."); }
   }
 
   async function clearHistory() {
@@ -788,9 +879,7 @@
         await Parse.Object.destroyAll(allHist);
         alert("Cloud history completely cleared.");
         openHistory(); 
-      } catch(e) {
-        alert("Error clearing history.");
-      }
+      } catch(e) { alert("Error clearing history."); }
     }
   }
   
