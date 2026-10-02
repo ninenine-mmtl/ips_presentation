@@ -249,6 +249,28 @@
       </div>
     </div>
 
+    <!-- Leaderboard Groups Config -->
+    <div class="card">
+      <div class="card-header-flex">
+        <h3 style="border:none; margin:0; font-size: 1.3rem;">Leaderboard Group Config</h3>
+      </div>
+      <p style="font-size:0.9rem; color:#ccc;">Define how students are grouped on the public leaderboard based on their grade tag (e.g., G1, G2). Students without matching grades fall into Uncategorized.</p>
+      
+      <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+        <input type="text" id="groupConfigName" placeholder="Group Name (e.g. Grade 1-4)" style="flex: 2; min-width: 150px; margin: 0;">
+        <input type="number" id="groupConfigMin" placeholder="Min Grade (e.g. 1)" style="flex: 1; min-width: 100px; margin: 0;">
+        <input type="number" id="groupConfigMax" placeholder="Max Grade (e.g. 4)" style="flex: 1; min-width: 100px; margin: 0;">
+        <button onclick="addLeaderboardGroup()" style="white-space: nowrap;">Add Group</button>
+      </div>
+
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Group Name</th><th>Min Grade</th><th>Max Grade</th><th>Action</th></tr></thead>
+          <tbody id="adminLeaderboardGroupList"></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Student Management & Backup with Collapse Button -->
     <div class="card">
       <div class="card-header-flex">
@@ -479,7 +501,14 @@
   Parse.serverURL = 'https://parseapi.back4app.com/';
   // ==========================================
 
-  let db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [], presence: {} };
+  // Default Leaderboard Groups Setup
+  let defaultLeaderboardGroups = [
+    { id: genId(), name: "Grade 1-4", min: 1, max: 4 },
+    { id: genId(), name: "Grade 5 & 6", min: 5, max: 6 },
+    { id: genId(), name: "Grade 7 and up", min: 7, max: 99 }
+  ];
+
+  let db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000', leaderboardGroups: defaultLeaderboardGroups }, logs: [], presence: {} };
   let currentUser = null; 
   let expandedRows = new Set(); 
   const genId = () => Math.random().toString(36).substr(2, 9);
@@ -489,6 +518,7 @@
   let lastStudentHash = "";
   let lastJudgeHash = "";
   let lastObserverHash = "";
+  let lastGroupHash = "";
   let lastJudgeStudentHash = "";
   let lastJudgeHistoryHash = "";
   let lastAdminHistoryHash = "";
@@ -496,6 +526,7 @@
   let forceStudentRender = true;
   let forceJudgeRender = true;
   let forceObserverRender = true;
+  let forceGroupRender = true;
   let forceJudgeStudentRender = true;
   
   // THE GHOST DATA ASSASSIN
@@ -549,14 +580,15 @@
             judges: data.judges || [],
             observers: data.observers || [],
             scores: data.scores || {},
-            settings: data.settings || { votingOpen: true, adminPin: '0000' },
+            settings: data.settings || { votingOpen: true, adminPin: '0000', leaderboardGroups: defaultLeaderboardGroups },
             logs: data.logs || [],
             presence: data.presence || {}
           };
           if(!db.settings.adminPin) db.settings.adminPin = '0000';
+          if(!db.settings.leaderboardGroups) db.settings.leaderboardGroups = defaultLeaderboardGroups;
         }
       } else {
-        db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000' }, logs: [], presence: {} };
+        db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000', leaderboardGroups: defaultLeaderboardGroups }, logs: [], presence: {} };
       }
       updateUI();
     } catch (error) {}
@@ -653,6 +685,7 @@
     updateHeaderStatus();
     if (currentUser?.role === 'admin') {
       renderAdminStudentList();
+      renderAdminGroupList();
       renderAdminJudgeList();
       renderAdminObserverList();
       updateAdminToggleBtn();
@@ -691,7 +724,7 @@
       document.getElementById('welcomeMsg').innerText = `Admin Access`;
       pushLog(`Access: Admin (U Nine Nine) logged in.`);
       showToast(`Welcome back, U Nine Nine.`);
-      forceStudentRender = forceJudgeRender = forceObserverRender = true;
+      forceStudentRender = forceGroupRender = forceJudgeRender = forceObserverRender = true;
       pingPresence();
       showView('adminView');
     } else {
@@ -763,7 +796,7 @@
         db.scores = {}; // Safely wipe only the scores
         
         pushLog("System: Admin performed a Test Mode Wipe (All scores deleted).");
-        forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
+        forceStudentRender = forceGroupRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
         
         await saveData();
         window.isSaving = false;
@@ -771,6 +804,57 @@
         showToast("All scores have been successfully cleared. Ready for the live event!");
       }
     }
+  }
+
+  /* LEADERBOARD GROUPS MANAGEMENT */
+  function addLeaderboardGroup() {
+    const name = document.getElementById('groupConfigName').value;
+    const min = parseInt(document.getElementById('groupConfigMin').value);
+    const max = parseInt(document.getElementById('groupConfigMax').value);
+    
+    if (!name || isNaN(min) || isNaN(max)) return showToast("Please fill all fields with valid numbers for grades.");
+    if (min > max) return showToast("Min grade cannot be greater than Max grade.");
+    
+    if (!db.settings.leaderboardGroups) db.settings.leaderboardGroups = [];
+    db.settings.leaderboardGroups.push({ id: genId(), name, min, max });
+    
+    pushLog(`System: Admin added leaderboard group '${name}'.`);
+    forceGroupRender = true;
+    lastLeaderboardHash = ""; 
+    saveData();
+    
+    document.getElementById('groupConfigName').value = '';
+    document.getElementById('groupConfigMin').value = '';
+    document.getElementById('groupConfigMax').value = '';
+  }
+
+  function removeLeaderboardGroup(id) {
+    if (confirm("Delete this leaderboard group?")) {
+      db.settings.leaderboardGroups = db.settings.leaderboardGroups.filter(g => g.id !== id);
+      pushLog(`System: Admin deleted a leaderboard group.`);
+      forceGroupRender = true;
+      lastLeaderboardHash = ""; 
+      saveData();
+    }
+  }
+
+  function renderAdminGroupList() {
+    const newHash = JSON.stringify(db.settings.leaderboardGroups || []);
+    if (lastGroupHash === newHash && !forceGroupRender) return;
+    lastGroupHash = newHash;
+    forceGroupRender = false;
+
+    const tbody = document.getElementById('adminLeaderboardGroupList');
+    if(!tbody) return;
+    tbody.innerHTML = '';
+    (db.settings.leaderboardGroups || []).forEach(g => {
+      tbody.innerHTML += `<tr>
+        <td>${g.name}</td>
+        <td>G${g.min}</td>
+        <td>G${g.max}</td>
+        <td><button class="danger-btn" onclick="removeLeaderboardGroup('${g.id}')">Delete</button></td>
+      </tr>`;
+    });
   }
 
   /* STUDENT MANAGEMENT */
@@ -1101,7 +1185,7 @@
       try { 
         db = JSON.parse(e.target.result); 
         pushLog(`System: Admin restored master database from file.`);
-        forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
+        forceStudentRender = forceGroupRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
         await saveData(); 
       } catch (err) { showToast("Error reading file."); }
     };
@@ -1112,9 +1196,9 @@
     if (confirm("WARNING: Deletes all data globally from the cloud! Are you sure?")) {
       window.isSaving = true; 
       window.lastFetchReq = 0; 
-      db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000' }, logs: [] };
+      db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000', leaderboardGroups: db.settings.leaderboardGroups || defaultLeaderboardGroups }, logs: [] };
       pushLog("System: ALL DATA FACTORY RESET BY ADMIN.");
-      forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
+      forceStudentRender = forceGroupRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
       
       try {
         const AppData = Parse.Object.extend("AppData");
@@ -1138,9 +1222,9 @@
         if (confirm("FINAL WARNING: Click OK to factory reset the entire database. This cannot be undone.")) {
           window.isSaving = true;
           window.lastFetchReq = 0;
-          db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin }, logs: [] };
+          db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin, leaderboardGroups: db.settings.leaderboardGroups || defaultLeaderboardGroups }, logs: [] };
           pushLog("System: ALL DATA FACTORY RESET FROM PUBLIC PAGE.");
-          forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
+          forceStudentRender = forceGroupRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
           
           try {
             const AppData = Parse.Object.extend("AppData");
@@ -1284,7 +1368,7 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  /* PUBLIC LEADERBOARD (SPLIT INTO GROUPS) */
+  /* PUBLIC LEADERBOARD (DYNAMIC GROUPS CONFIGURATION) */
   function toggleRowDetails(studentId) {
     if (expandedRows.has(studentId)) expandedRows.delete(studentId); else expandedRows.add(studentId);
     lastLeaderboardHash = ""; 
@@ -1298,7 +1382,7 @@
   }
 
   function renderLeaderboard() {
-    const newHash = JSON.stringify(db.students) + JSON.stringify(db.scores) + expandedRows.size;
+    const newHash = JSON.stringify(db.students) + JSON.stringify(db.scores) + JSON.stringify(db.settings.leaderboardGroups) + expandedRows.size;
     if (lastLeaderboardHash === newHash) return;
     lastLeaderboardHash = newHash;
 
@@ -1322,8 +1406,25 @@
       return { ...student, score: avgScore, judges: judgeCount, scoresObj, grade: gradeNum };
     });
 
-    let group1 = allResults.filter(r => r.grade <= 5).sort((a, b) => b.score - a.score);
-    let group2 = allResults.filter(r => r.grade >= 6).sort((a, b) => b.score - a.score);
+    // Sort configured groups chronologically by their Min Grade
+    let configuredGroups = db.settings.leaderboardGroups || defaultLeaderboardGroups;
+    configuredGroups.sort((a, b) => a.min - b.min);
+
+    let unassigned = [];
+    let groupBuckets = configuredGroups.map(g => ({ ...g, students: [] }));
+
+    // Assign students to their proper dynamic groups
+    allResults.forEach(r => {
+        let matched = false;
+        for (let bucket of groupBuckets) {
+            if (r.grade >= bucket.min && r.grade <= bucket.max) {
+                bucket.students.push(r);
+                matched = true;
+                break; 
+            }
+        }
+        if (!matched) unassigned.push(r);
+    });
 
     const renderGroup = (groupData, groupName) => {
       if (groupData.length === 0) return; 
@@ -1373,8 +1474,17 @@
       });
     };
 
-    renderGroup(group1, "Group 1 (G1 to G5)");
-    renderGroup(group2, "Group 2 (G6 to G10)");
+    // Render configured groups
+    groupBuckets.forEach(bucket => {
+        bucket.students.sort((a, b) => b.score - a.score);
+        renderGroup(bucket.students, bucket.name);
+    });
+
+    // Render unassigned students at the bottom to ensure no one is hidden
+    if (unassigned.length > 0) {
+        unassigned.sort((a, b) => b.score - a.score);
+        renderGroup(unassigned, "Other / Uncategorized");
+    }
   }
   
   // Real-time Master DB listener
