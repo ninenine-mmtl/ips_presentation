@@ -109,7 +109,7 @@
   .log-list li { padding: 8px 0; border-bottom: 1px dashed #233554; }
   .log-timestamp { color: #FFC107; margin-right: 10px; }
 
-  /* Slide-in Toast Notifications - Reduced Animation Speed */
+  /* Slide-in Toast Notifications */
   #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
   .toast { background: rgba(17, 34, 64, 0.95); border-left: 4px solid #FFC107; color: white; padding: 15px 20px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 0.9rem; 
            animation: slideIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards, fadeOut 1.2s 5s ease-in forwards; pointer-events: auto; }
@@ -302,10 +302,13 @@
       </div>
     </div>
 
-    <!-- Master Voting History -->
+    <!-- Master Voting History & Wipe Test Scores -->
     <div class="card">
-      <h3>Full Master Voting History</h3>
-      <p style="font-size:0.9rem; color:#ccc;">Review every score submitted by every judge.</p>
+      <div class="card-header-flex">
+        <h3 style="border:none; margin:0; font-size: 1.3rem;">Full Master Voting History</h3>
+        <button class="danger-btn" onclick="clearAllScores()">⚠️ Clear All Scores (Test Wipe)</button>
+      </div>
+      <p style="font-size:0.9rem; color:#ccc;">Review every score submitted by every judge. Use the button above to clear all votes after a test run.</p>
       <div class="table-responsive">
         <table>
           <thead>
@@ -522,21 +525,17 @@
   async function fetchDb() {
     if (window.isSaving) return; 
 
-    // Generate unique stamp for this specific fetch request
     const currentReq = Date.now();
     window.lastFetchReq = currentReq;
 
     const AppData = Parse.Object.extend("AppData");
     const query = new Parse.Query(AppData);
-    query.descending("createdAt"); // Always fetch the absolute newest row
+    query.descending("createdAt"); 
     query.limit(1);
     
     try {
       const results = await query.find();
 
-      // 🛡️ GHOST DATA ASSASSIN 🛡️
-      // If the Admin hit "Save" or "Factory Reset" while this network request was flying through the air,
-      // it aborts instantly and permanently deletes the old data instead of rendering it.
       if (window.isSaving || window.lastFetchReq !== currentReq) {
           return; 
       }
@@ -565,7 +564,7 @@
 
   async function saveData(silent = false) { 
     window.isSaving = true; 
-    window.lastFetchReq = 0; // Kills all incoming network requests instantly
+    window.lastFetchReq = 0; 
 
     const AppData = Parse.Object.extend("AppData");
     let obj;
@@ -574,16 +573,15 @@
         obj = new AppData();
         obj.id = parseDocId;
     } else {
-        obj = new AppData(); // Make a brand new file if one doesn't exist
+        obj = new AppData(); 
     }
 
-    // Force Deep Clone to guarantee the Parse SDK pushes it to the server
     obj.set("payload", JSON.parse(JSON.stringify(db)));
     
     try {
         const saved = await obj.save();
         parseDocId = saved.id;
-        setTimeout(() => { window.isSaving = false; }, 800); // Hold lock for 800ms to guarantee server registers it
+        setTimeout(() => { window.isSaving = false; }, 800); 
         if (!silent) showToast("Changes saved successfully!");
     } catch (error) {
         window.isSaving = false;
@@ -593,15 +591,62 @@
   
   function pushLog(msg) { db.logs.push({ time: new Date().toLocaleTimeString(), message: msg }); }
 
-  function pingPresence() {
-    if (!currentUser || window.isSaving) return;
-    const id = (currentUser.role === 'admin' ? 'admin' : currentUser.id);
-    const name = (currentUser.role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name);
-    
-    if (!db.presence) db.presence = {};
-    db.presence[id] = { name: name, time: Date.now() };
-    saveData(true); 
+  /* ============================================================== */
+  /* ISOLATED PRESENCE TRACKER */
+  /* ============================================================== */
+  async function pingPresence() {
+    if (!currentUser) return;
+    const role = currentUser.role;
+    const name = (role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name);
+
+    const Presence = Parse.Object.extend("PresenceTracker");
+    const query = new Parse.Query(Presence);
+    query.equalTo("userName", name);
+    try {
+        let pObj;
+        const results = await query.find();
+        if (results.length > 0) {
+            pObj = results[0];
+        } else {
+            pObj = new Presence();
+            pObj.set("userName", name);
+            pObj.set("role", role);
+        }
+        pObj.set("lastActive", Date.now());
+        await pObj.save(); 
+    } catch(e) { console.log(e) }
   }
+
+  let lastViewerMsg = "";
+  async function checkViewers() {
+    const Presence = Parse.Object.extend("PresenceTracker");
+    const query = new Parse.Query(Presence);
+    
+    query.greaterThan("lastActive", Date.now() - 60000); 
+    try {
+        const results = await query.find();
+        let count = results.length;
+        let adminWatching = false;
+        let observers = [];
+
+        results.forEach(r => {
+            const role = r.get("role");
+            const name = r.get("userName");
+            if (role === 'admin') adminWatching = true;
+            else if (role === 'observer') observers.push(name);
+        });
+
+        let msg = `👁 ${count} user(s) currently active.`;
+        if (adminWatching) msg += ` Admin is online.`;
+        if (observers.length > 0) msg += ` Logged in: ${observers.join(', ')}.`;
+
+        if (msg !== lastViewerMsg) {
+            showToast(msg);
+            lastViewerMsg = msg;
+        }
+    } catch(e) {}
+  }
+  /* ============================================================== */
 
   function updateUI() {
     renderLeaderboard();
@@ -684,11 +729,6 @@
   }
 
   function logout() { 
-    if (currentUser) {
-        const id = (currentUser.role === 'admin' ? 'admin' : currentUser.id);
-        delete db.presence[id];
-        saveData(true); 
-    }
     currentUser = null; 
     document.getElementById('authButtons').style.display = 'block'; 
     document.getElementById('userMenu').style.display = 'none'; 
@@ -711,6 +751,26 @@
     const btn = document.getElementById('toggleVotingBtn');
     if (db.settings.votingOpen) { btn.innerText = "Close Voting"; btn.className = "danger-btn"; } 
     else { btn.innerText = "Open Voting"; btn.className = "success-btn"; }
+  }
+
+  /* TEST MODE WIPE - CLEARS SCORES ONLY */
+  async function clearAllScores() {
+    if (confirm("WARNING 1/2: Do you want to wipe ALL submitted scores? (Use this to clear out test votes).")) {
+      if (confirm("FINAL WARNING 2/2: Are you absolutely sure? This will delete all scores permanently. Students, Judges, Observers, and Passwords will remain intact. Proceed?")) {
+        window.isSaving = true;
+        window.lastFetchReq = 0;
+        
+        db.scores = {}; // Safely wipe only the scores
+        
+        pushLog("System: Admin performed a Test Mode Wipe (All scores deleted).");
+        forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
+        
+        await saveData();
+        window.isSaving = false;
+        updateUI();
+        showToast("All scores have been successfully cleared. Ready for the live event!");
+      }
+    }
   }
 
   /* STUDENT MANAGEMENT */
@@ -1052,7 +1112,7 @@
     if (confirm("WARNING: Deletes all data globally from the cloud! Are you sure?")) {
       window.isSaving = true; 
       window.lastFetchReq = 0; 
-      db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000' }, logs: [], presence: {} };
+      db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000' }, logs: [] };
       pushLog("System: ALL DATA FACTORY RESET BY ADMIN.");
       forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
       
@@ -1060,7 +1120,7 @@
         const AppData = Parse.Object.extend("AppData");
         const query = new Parse.Query(AppData);
         const allDocs = await query.find();
-        await Parse.Object.destroyAll(allDocs); // Physically burns ghost data
+        await Parse.Object.destroyAll(allDocs); 
       } catch(e) {}
       
       parseDocId = null;
@@ -1078,7 +1138,7 @@
         if (confirm("FINAL WARNING: Click OK to factory reset the entire database. This cannot be undone.")) {
           window.isSaving = true;
           window.lastFetchReq = 0;
-          db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin }, logs: [], presence: {} };
+          db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin }, logs: [] };
           pushLog("System: ALL DATA FACTORY RESET FROM PUBLIC PAGE.");
           forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = true;
           
@@ -1129,7 +1189,6 @@
 
     const judge = db.judges.find(j => j.id === currentUser.id);
     
-    // Strict Hash Lock prevents flashing.
     const newHash = JSON.stringify(db.students) + (judge ? judge.forbiddenTownships : "");
     if (lastJudgeStudentHash === newHash && !forceJudgeStudentRender) return; 
     lastJudgeStudentHash = newHash;
@@ -1225,7 +1284,7 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  /* PUBLIC LEADERBOARD */
+  /* PUBLIC LEADERBOARD (SPLIT INTO GROUPS) */
   function toggleRowDetails(studentId) {
     if (expandedRows.has(studentId)) expandedRows.delete(studentId); else expandedRows.add(studentId);
     lastLeaderboardHash = ""; 
@@ -1248,7 +1307,7 @@
     
     if (db.students.length === 0) return tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No students yet.</td></tr>';
 
-    let results = db.students.map(student => {
+    let allResults = db.students.map(student => {
       let scoresObj = db.scores[student.id];
       let avgScore = 0;
       let judgeCount = scoresObj ? Object.keys(scoresObj).length : 0;
@@ -1256,87 +1315,77 @@
         let totalPoints = Object.values(scoresObj).reduce((sum, s) => sum + s.total, 0);
         avgScore = totalPoints / judgeCount;
       }
-      return { ...student, score: avgScore, judges: judgeCount, scoresObj };
-    }).sort((a, b) => b.score - a.score);
-
-    results.forEach((r, index) => {
-      let rClass = (index === 0 && r.score > 0) ? 'rank-1' : (index === 1 && r.score > 0) ? 'rank-2' : (index === 2 && r.score > 0) ? 'rank-3' : '';
-      let isExpanded = expandedRows.has(r.id);
       
-      tbody.innerHTML += `<tr class="student-row ${rClass}" onclick="toggleRowDetails('${r.id}')">
-        <td>#${index + 1}</td>
-        <td>${r.name} <span style="font-size:0.75rem; color:#FFC107; margin-left:10px;">${isExpanded ? '▼ Hide details' : '▶ Show details'}</span></td>
-        <td>${r.township}</td>
-        <td>${r.score.toFixed(2)} <span style="font-size:0.8rem;color:#aaa;">(${r.judges} votes)</span></td>
-      </tr>`;
-
-      if (isExpanded) {
-        let detailsHTML = `<tr><td colspan="4" class="details-container">
-          <table class="details-table">
-            <thead><tr><th>Judge</th><th>Pronunciation (5)</th><th>Grammar (3)</th><th>Fluency (4)</th><th>Q&A (6)</th><th>Content (3)</th><th>Delivery (4)</th><th>Total (25)</th></tr></thead>
-            <tbody>`;
-        
-        if (r.scoresObj && Object.keys(r.scoresObj).length > 0) {
-          Object.keys(r.scoresObj).forEach(judgeId => {
-            const judge = db.judges.find(j => j.id === judgeId);
-            const jName = judge ? judge.name : 'Unknown';
-            const s = r.scoresObj[judgeId];
-            detailsHTML += `<tr>
-              <td style="font-weight:bold; color:#FFC107;">${jName}</td>
-              <td>${s.pron}</td><td>${s.gram}</td><td>${s.flu}</td><td>${s.qa}</td><td>${s.cont}</td><td>${s.deliv}</td>
-              <td style="font-weight:bold; color:white;">${s.total}</td>
-            </tr>`;
-          });
-        } else {
-          detailsHTML += `<tr><td colspan="8" style="text-align:center; color:#aaa;">No scores submitted yet.</td></tr>`;
-        }
-        detailsHTML += `</tbody></table></td></tr>`;
-        tbody.innerHTML += detailsHTML;
-      }
+      let gradeMatch = student.name.match(/\(G(\d+)\)/i);
+      let gradeNum = gradeMatch ? parseInt(gradeMatch[1]) : 0; 
+      
+      return { ...student, score: avgScore, judges: judgeCount, scoresObj, grade: gradeNum };
     });
+
+    let group1 = allResults.filter(r => r.grade <= 5).sort((a, b) => b.score - a.score);
+    let group2 = allResults.filter(r => r.grade >= 6).sort((a, b) => b.score - a.score);
+
+    const renderGroup = (groupData, groupName) => {
+      if (groupData.length === 0) return; 
+      
+      tbody.innerHTML += `
+        <tr style="background: #FFC107; color: #020C1B; text-align: center;">
+          <td colspan="4" style="padding: 12px; font-weight: 900; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">
+            🏆 ${groupName}
+          </td>
+        </tr>
+      `;
+      
+      groupData.forEach((r, index) => {
+        let rClass = (index === 0 && r.score > 0) ? 'rank-1' : (index === 1 && r.score > 0) ? 'rank-2' : (index === 2 && r.score > 0) ? 'rank-3' : '';
+        let isExpanded = expandedRows.has(r.id);
+        
+        tbody.innerHTML += `<tr class="student-row ${rClass}" onclick="toggleRowDetails('${r.id}')">
+          <td>#${index + 1}</td>
+          <td>${r.name} <span style="font-size:0.75rem; color:#FFC107; margin-left:10px;">${isExpanded ? '▼ Hide details' : '▶ Show details'}</span></td>
+          <td>${r.township}</td>
+          <td>${r.score.toFixed(2)} <span style="font-size:0.8rem;color:#aaa;">(${r.judges} votes)</span></td>
+        </tr>`;
+
+        if (isExpanded) {
+          let detailsHTML = `<tr><td colspan="4" class="details-container">
+            <table class="details-table">
+              <thead><tr><th>Judge</th><th>Pronunciation (5)</th><th>Grammar (3)</th><th>Fluency (4)</th><th>Q&A (6)</th><th>Content (3)</th><th>Delivery (4)</th><th>Total (25)</th></tr></thead>
+              <tbody>`;
+          
+          if (r.scoresObj && Object.keys(r.scoresObj).length > 0) {
+            Object.keys(r.scoresObj).forEach(judgeId => {
+              const judge = db.judges.find(j => j.id === judgeId);
+              const jName = judge ? judge.name : 'Unknown';
+              const s = r.scoresObj[judgeId];
+              detailsHTML += `<tr>
+                <td style="font-weight:bold; color:#FFC107;">${jName}</td>
+                <td>${s.pron}</td><td>${s.gram}</td><td>${s.flu}</td><td>${s.qa}</td><td>${s.cont}</td><td>${s.deliv}</td>
+                <td style="font-weight:bold; color:white;">${s.total}</td>
+              </tr>`;
+            });
+          } else {
+            detailsHTML += `<tr><td colspan="8" style="text-align:center; color:#aaa;">No scores submitted yet.</td></tr>`;
+          }
+          detailsHTML += `</tbody></table></td></tr>`;
+          tbody.innerHTML += detailsHTML;
+        }
+      });
+    };
+
+    renderGroup(group1, "Group 1 (G1 to G5)");
+    renderGroup(group2, "Group 2 (G6 to G10)");
   }
   
   // Real-time Master DB listener
   setInterval(fetchDb, 3000);
   fetchDb();
 
-  // Keep presence updated every 45 seconds to avoid timeouts
+  // Keeps isolated presence updated every 45 seconds to avoid timeouts
   setInterval(pingPresence, 45000);
 
   // Checks Viewer Tracker every 30 seconds
-  let lastViewerMsg = "";
-  setInterval(() => {
-    const now = Date.now();
-    let count = 0;
-    let adminWatching = false;
-    let observers = [];
-    
-    if (db.presence) {
-        Object.values(db.presence).forEach(p => {
-            // Tolerates up to 120 seconds (2 minutes) to account for device clock differences!
-            if (now - p.time < 120000) { 
-                count++;
-                if (p.name === 'U Nine Nine - Pakokku') {
-                    adminWatching = true;
-                } else if (p.name !== 'Public Viewer') {
-                    observers.push(`${p.name}`);
-                }
-            }
-        });
-    }
-    
-    let msg = `👁 ${count} user(s) currently active.`;
-    if (adminWatching) msg += ` Admin is online.`;
-    if (observers.length > 0) {
-       msg += ` Logged in: ${observers.join(', ')}.`;
-    }
-    
-    // ONLY shows pop-up if someone actually joined or left!
-    if (msg !== lastViewerMsg) {
-        showToast(msg);
-        lastViewerMsg = msg;
-    }
-  }, 30000);
+  setInterval(checkViewers, 30000);
 
 </script>
 </body>
