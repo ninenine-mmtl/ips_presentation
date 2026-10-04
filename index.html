@@ -89,6 +89,7 @@
   .rank-1 { color: #FFC107; font-weight: bold; }
   .rank-2 { color: white; font-weight: bold; }
   .rank-3 { color: #cd7f32; font-weight: bold; }
+  .rank-declined { color: #e74c3c; font-weight: bold; }
 
   .details-container { padding: 0 !important; border-bottom: 2px solid #FFC107 !important; }
   .details-table { width: 100%; font-size: 0.85rem; background: rgba(255, 193, 7, 0.05); min-width: 100%; }
@@ -172,7 +173,7 @@
       <div class="table-responsive">
         <table>
           <thead>
-            <tr><th>Rank</th><th>Student Name</th><th>Township</th><th>Avg Total (out of 25)</th></tr>
+            <tr><th>Rank / Prize</th><th>Student Name & Remarks</th><th>Township</th><th>Avg Total (out of 25)</th></tr>
           </thead>
           <tbody id="leaderboardBody"></tbody>
         </table>
@@ -246,6 +247,20 @@
         <input type="text" id="observerName" placeholder="Name (e.g., Observer John)">
         <input type="password" id="observerPassword" maxlength="4" placeholder="Set 4-Digit PIN" inputmode="numeric">
         <button onclick="addObserver()">Create Observer</button>
+      </div>
+    </div>
+
+    <!-- Leaderboard Awards & Remarks (NEW) -->
+    <div class="card">
+      <div class="card-header-flex">
+        <h3 style="border:none; margin:0; font-size: 1.3rem;">Manage Awards & Public Remarks</h3>
+      </div>
+      <p style="font-size:0.9rem; color:#ccc;">Manually assign winners (overrides auto-ranking) or add a custom remark below their name.</p>
+      <div class="table-responsive">
+        <table>
+          <thead><tr><th>Student</th><th>Prize Override</th><th>Public Remark</th><th>Action</th></tr></thead>
+          <tbody id="adminAwardsList"></tbody>
+        </table>
       </div>
     </div>
 
@@ -517,10 +532,12 @@
   let lastJudgeHash = "";
   let lastObserverHash = "";
   let lastGroupHash = "";
+  let lastAwardsHash = "";
   let lastJudgeStudentHash = "";
   let lastJudgeHistoryHash = "";
   let lastAdminHistoryHash = "";
   let lastLeaderboardHash = "";
+  
   let forceStudentRender = true;
   let forceJudgeRender = true;
   let forceObserverRender = true;
@@ -686,6 +703,7 @@
       renderAdminJudgeList();
       renderAdminObserverList();
       renderAdminGroups();
+      renderAdminAwardsList();
       updateAdminToggleBtn();
       renderAdminLogs('adminLogsList');
       renderAdminHistory('adminVotingHistory'); 
@@ -723,6 +741,7 @@
       pushLog(`Access: Admin (U Nine Nine) logged in.`);
       showToast(`Welcome back, U Nine Nine.`);
       forceStudentRender = forceJudgeRender = forceObserverRender = forceGroupRender = true;
+      lastAwardsHash = "";
       pingPresence();
       showView('adminView');
     } else {
@@ -791,16 +810,64 @@
         window.isSaving = true;
         window.lastFetchReq = 0;
         
-        db.scores = {}; // Safely wipe only the scores
+        db.scores = {}; 
         
         pushLog("System: Admin performed a Test Mode Wipe (All scores deleted).");
         forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = forceGroupRender = true;
+        lastAwardsHash = lastLeaderboardHash = "";
         
         await saveData();
         window.isSaving = false;
         updateUI();
         showToast("All scores have been successfully cleared. Ready for the live event!");
       }
+    }
+  }
+
+  /* AWARDS & REMARKS MANAGEMENT */
+  function renderAdminAwardsList() {
+    const active = document.activeElement;
+    if (active && active.tagName === 'INPUT' && active.id && active.id.startsWith('aRemark_')) return; 
+
+    const newHash = JSON.stringify(db.students);
+    if (lastAwardsHash === newHash) return;
+    lastAwardsHash = newHash;
+
+    const tbody = document.getElementById('adminAwardsList');
+    if(!tbody) return;
+    tbody.innerHTML = '';
+    
+    let sorted = [...db.students].sort((a,b) => a.name.localeCompare(b.name));
+    
+    sorted.forEach(s => {
+        let prize = s.prize || 'Auto';
+        let remark = s.remark || '';
+        tbody.innerHTML += `<tr>
+            <td>${s.name} <span style="color:#aaa; font-size:0.8rem;">(${s.township})</span></td>
+            <td>
+                <select id="aPrize_${s.id}" class="table-input" style="width:130px; font-weight:bold;">
+                    <option value="Auto" ${prize==='Auto'?'selected':''}>Auto Rank</option>
+                    <option value="1st Prize 🏆" ${prize==='1st Prize 🏆'?'selected':''}>1st Prize 🏆</option>
+                    <option value="2nd Prize 🥈" ${prize==='2nd Prize 🥈'?'selected':''}>2nd Prize 🥈</option>
+                    <option value="3rd Prize 🥉" ${prize==='3rd Prize 🥉'?'selected':''}>3rd Prize 🥉</option>
+                    <option value="Declined ❌" ${prize==='Declined ❌'?'selected':''}>Declined ❌</option>
+                    <option value="Consolation 🏅" ${prize==='Consolation 🏅'?'selected':''}>Consolation 🏅</option>
+                </select>
+            </td>
+            <td><input type="text" id="aRemark_${s.id}" class="table-input" value="${remark}" placeholder="e.g. Great confidence!"></td>
+            <td><button onclick="updateAward('${s.id}')">Save</button></td>
+        </tr>`;
+    });
+  }
+
+  function updateAward(id) {
+    const s = db.students.find(x => x.id === id);
+    if (s) {
+        s.prize = document.getElementById(`aPrize_${id}`).value;
+        s.remark = document.getElementById(`aRemark_${id}`).value;
+        pushLog(`System: Admin updated public awards/remarks for '${s.name}'.`);
+        lastLeaderboardHash = ""; // Force public board to redraw
+        saveData();
     }
   }
 
@@ -817,7 +884,7 @@
     
     pushLog(`System: Admin added leaderboard group '${name}'.`);
     forceGroupRender = true;
-    lastLeaderboardHash = ""; // Force leaderboard refresh
+    lastLeaderboardHash = ""; 
     saveData();
     
     document.getElementById('newGroupName').value = ''; 
@@ -826,7 +893,6 @@
   }
 
   function renderAdminGroups() {
-    // Focus Protection: Protects admin typing in group settings
     const active = document.activeElement;
     if (active && active.tagName === 'INPUT' && active.id && active.id.startsWith('gInput_')) return; 
 
@@ -859,7 +925,7 @@
       
       pushLog(`System: Admin updated leaderboard group '${group.name}'.`);
       forceGroupRender = true;
-      lastLeaderboardHash = ""; // Force leaderboard refresh
+      lastLeaderboardHash = ""; 
       saveData();
     }
   }
@@ -869,7 +935,7 @@
       db.settings.groups = db.settings.groups.filter(g => g.id !== id);
       pushLog(`System: Admin deleted a leaderboard group.`);
       forceGroupRender = true;
-      lastLeaderboardHash = ""; // Force leaderboard refresh
+      lastLeaderboardHash = ""; 
       saveData();
     }
   }
@@ -882,6 +948,7 @@
     db.students.push({ id: genId(), name, township: twp });
     pushLog(`System: Admin added student '${name}'.`);
     forceStudentRender = forceJudgeRender = forceJudgeStudentRender = true; 
+    lastAwardsHash = "";
     saveData();
     document.getElementById('studentName').value = ''; document.getElementById('studentTownship').value = '';
   }
@@ -893,6 +960,7 @@
       delete db.scores[id];
       pushLog(`System: Admin deleted student '${student.name}'.`);
       forceStudentRender = forceJudgeRender = forceJudgeStudentRender = true;
+      lastAwardsHash = "";
       saveData();
     }
   }
@@ -940,10 +1008,11 @@
         const imported = JSON.parse(e.target.result);
         if (!Array.isArray(imported)) throw new Error("Invalid format");
         if (confirm(`Import ${imported.length} students? This will add them to the existing list.`)) {
-          const newStudents = imported.map(s => ({ id: genId(), name: s.name, township: s.township }));
+          const newStudents = imported.map(s => ({ id: genId(), name: s.name, township: s.township, prize: s.prize||'Auto', remark: s.remark||'' }));
           db.students = db.students.concat(newStudents);
           pushLog(`System: Admin imported ${imported.length} students.`);
           forceStudentRender = forceJudgeRender = forceJudgeStudentRender = true;
+          lastAwardsHash = "";
           saveData();
         }
       } catch (err) { showToast("Error reading student file. Invalid format."); }
@@ -1203,6 +1272,7 @@
         db = JSON.parse(e.target.result); 
         pushLog(`System: Admin restored master database from file.`);
         forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = forceGroupRender = true;
+        lastAwardsHash = lastLeaderboardHash = "";
         await saveData(); 
       } catch (err) { showToast("Error reading file."); }
     };
@@ -1216,6 +1286,7 @@
       db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000', groups: defaultGroups }, logs: [] };
       pushLog("System: ALL DATA FACTORY RESET BY ADMIN.");
       forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = forceGroupRender = true;
+      lastAwardsHash = lastLeaderboardHash = "";
       
       try {
         const AppData = Parse.Object.extend("AppData");
@@ -1242,6 +1313,7 @@
           db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin, groups: defaultGroups }, logs: [] };
           pushLog("System: ALL DATA FACTORY RESET FROM PUBLIC PAGE.");
           forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = forceGroupRender = true;
+          lastAwardsHash = lastLeaderboardHash = "";
           
           try {
             const AppData = Parse.Object.extend("AppData");
@@ -1386,7 +1458,7 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  /* PUBLIC LEADERBOARD (DYNAMIC GROUPS) */
+  /* PUBLIC LEADERBOARD (DYNAMIC GROUPS & MANUAL PRIZES) */
   function toggleRowDetails(studentId) {
     if (expandedRows.has(studentId)) expandedRows.delete(studentId); else expandedRows.add(studentId);
     lastLeaderboardHash = ""; 
@@ -1437,12 +1509,29 @@
       `;
       
       groupData.forEach((r, index) => {
-        let rClass = (index === 0 && r.score > 0) ? 'rank-1' : (index === 1 && r.score > 0) ? 'rank-2' : (index === 2 && r.score > 0) ? 'rank-3' : '';
+        let displayRank = `#${index + 1}`;
+        let rClass = '';
+
+        // Default Auto Ranking Highlight
+        if (index === 0 && r.score > 0) rClass = 'rank-1';
+        else if (index === 1 && r.score > 0) rClass = 'rank-2';
+        else if (index === 2 && r.score > 0) rClass = 'rank-3';
+
+        // Override with Manual Awards
+        if (r.prize && r.prize !== 'Auto') {
+            displayRank = r.prize;
+            if (r.prize.includes('1st')) rClass = 'rank-1';
+            else if (r.prize.includes('2nd')) rClass = 'rank-2';
+            else if (r.prize.includes('3rd')) rClass = 'rank-3';
+            else if (r.prize.includes('Declined')) rClass = 'rank-declined';
+        }
+
         let isExpanded = expandedRows.has(r.id);
+        let remarkHTML = r.remark ? `<br><div style="font-size:0.85rem; color:#4caf50; font-style:italic; margin-top:3px;">💬 ${r.remark}</div>` : '';
         
         tbody.innerHTML += `<tr class="student-row ${rClass}" onclick="toggleRowDetails('${r.id}')">
-          <td>#${index + 1}</td>
-          <td>${r.name} <span style="font-size:0.75rem; color:#FFC107; margin-left:10px;">${isExpanded ? '▼ Hide details' : '▶ Show details'}</span></td>
+          <td style="font-weight:bold;">${displayRank}</td>
+          <td>${r.name} <span style="font-size:0.75rem; color:#FFC107; margin-left:10px;">${isExpanded ? '▼ Hide details' : '▶ Show details'}</span>${remarkHTML}</td>
           <td>${r.township}</td>
           <td>${r.score.toFixed(2)} <span style="font-size:0.8rem;color:#aaa;">(${r.judges} votes)</span></td>
         </tr>`;
