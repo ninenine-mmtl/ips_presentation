@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>IPS English Presentation Live Scoring</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>IPS Judge Analytics & Live Status</title>
 
 <!-- BACK4APP (PARSE) SCRIPTS -->
 <script type="text/javascript" src="https://npmcdn.com/parse/dist/parse.min.js"></script>
@@ -11,33 +11,26 @@
 <style>
   /* Deep Dark Blue Theme */
   body { 
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-    background-color: #000033; /* Pure Dark Blue */
+    font-family: 'Segoe UI', Pyidaungsu, Myanmar3, Tahoma, sans-serif; 
+    background-color: #000033; 
     color: #ffffff; 
     margin: 0; 
     padding: 0; 
     min-height: 100vh;
   }
   
-  .container { max-width: 1200px; margin: 20px auto; padding: 15px; box-sizing: border-box; }
+  .container { max-width: 1000px; margin: 20px auto; padding: 10px; box-sizing: border-box; }
   
-  /* Header & Logo */
+  /* Header */
   header { 
-    background: rgba(0, 0, 40, 0.95); padding: 15px 20px; display: flex; flex-direction: column; 
-    gap: 15px; align-items: center; text-align: center; border-bottom: 3px solid #FFC107; 
+    background: rgba(0, 0, 40, 0.95); padding: 15px 10px; display: flex; flex-direction: column; 
+    gap: 10px; align-items: center; text-align: center; border-bottom: 3px solid #FFC107; 
   }
-  .header-content { display: flex; flex-direction: column; gap: 10px; align-items: center; }
-  
-  .header-title-container {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 15px;
-  }
+  .header-content { display: flex; flex-direction: column; gap: 10px; align-items: center; width: 100%; }
   
   .header-logo {
-    height: 65px;
-    width: 65px;
+    height: 55px;
+    width: 55px;
     border-radius: 50%;
     border: 2px solid #FFC107;
     object-fit: contain;
@@ -45,508 +38,92 @@
     box-shadow: 0 4px 10px rgba(0,0,0,0.5);
   }
 
-  .header-badges { display: flex; gap: 10px; align-items: center; justify-content: center; flex-wrap: wrap; }
-  .header-actions { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; width: 100%; }
-  
-  h1 { margin: 0; font-size: 1.5rem; color: #FFC107; line-height: 1.2; }
-  
-  /* Buttons */
-  button, .nav-btn { 
-    background: #FFC107; color: #020C1B; border: none; padding: 10px 15px; 
-    border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 0.95rem; 
-    transition: 0.2s; text-decoration: none; text-align: center; display: inline-block;
-  }
-  button:hover, .nav-btn:hover { background: #FFD700; transform: scale(1.02); }
-  button:disabled { background: #555; color: #aaa; cursor: not-allowed; transform: none; }
-  
-  .danger-btn { background: #e74c3c !important; color: white !important; border: 2px solid #c0392b !important; }
-  .danger-btn:hover { background: #c0392b !important; color: white !important; }
-  .success-btn { background: #FFC107; color: #020C1B; border: 2px solid #FFD700; }
-  
-  input, select { padding: 12px; margin: 5px 0 10px 0; border-radius: 5px; border: 1px solid #FFC107; background: #000033; color: white; width: 100%; box-sizing: border-box; }
-  .table-input { padding: 8px; margin: 0; font-size: 0.9rem; }
-  
-  /* View Controllers */
-  .view-section { display: none; animation: fadeIn 0.3s; }
-  .active-view { display: block; }
+  h1 { margin: 0; font-size: 1.3rem; color: #FFC107; line-height: 1.3; }
   
   /* Cards */
-  .card { background: rgba(0, 20, 60, 0.95); padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #FFC107; box-shadow: 0 4px 15px rgba(0,0,0,0.5); backdrop-filter: blur(5px); }
-  h2, h3 { margin-top: 0; border-bottom: 1px solid #001133; padding-bottom: 10px; color: #FFC107; }
+  .card { background: rgba(0, 20, 60, 0.95); padding: 15px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #3498db; box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3); backdrop-filter: blur(5px); }
+  h2 { margin-top: 0; border-bottom: 1px solid #001133; padding-bottom: 10px; color: #3498db; text-align: center; font-size: 1.4rem;}
+  .subtitle { text-align: center; color: #ccc; font-size: 0.85rem; margin-bottom: 15px; line-height: 1.5;}
 
-  .card-header-flex { display: flex; flex-direction: column; align-items: center; gap: 15px; margin-bottom: 15px; text-align: center; }
-  .card-header-flex h2, .card-header-flex h3 { border: none; padding: 0; margin: 0; font-size: 1.8rem; }
+  /* Tables - Mobile Optimized */
+  .table-responsive { 
+    overflow-x: auto; 
+    width: 100%; 
+    -webkit-overflow-scrolling: touch; 
+    background: rgba(255,255,255,0.05); 
+    border-radius: 8px; 
+  }
+  table { width: 100%; border-collapse: collapse; font-size: 0.95rem; text-align: center; }
+  th, td { padding: 12px 10px; border-bottom: 1px solid #001133; vertical-align: middle; }
+  th { 
+    background: #000022; 
+    color: #3498db; 
+    letter-spacing: 0.5px; 
+    font-size: 0.85rem;
+    line-height: 1.4;
+  }
   
-  /* Tables */
-  .table-responsive { overflow-x: auto; width: 100%; -webkit-overflow-scrolling: touch; }
-  table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 0.95rem; min-width: 600px; }
-  th, td { padding: 12px 15px; text-align: left; border-bottom: 1px solid #001133; }
-  th { background: #000022; color: #FFC107; }
+  .judge-name { color: #FFC107; font-weight: bold; text-align: left;}
+  .highlight { font-weight: bold; color: white; }
   
-  .student-row { cursor: pointer; transition: background 0.2s; }
-  .student-row:hover { background: rgba(255,255,255,0.1) !important; }
-  
-  .rank-1 { color: #FFC107; font-weight: bold; }
-  .rank-2 { color: white; font-weight: bold; }
-  .rank-3 { color: #cd7f32; font-weight: bold; }
-  .rank-declined { color: #e74c3c; font-weight: bold; }
-
-  .details-container { padding: 0 !important; border-bottom: 2px solid #FFC107 !important; }
-  .details-table { width: 100%; font-size: 0.85rem; background: rgba(255, 193, 7, 0.05); min-width: 100%; }
-  .details-table th { background: rgba(255, 193, 7, 0.15); color: #FFC107; padding: 10px; text-transform: uppercase; font-size: 0.75rem; }
-  .details-table td { padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.05); }
-
-  /* Scoring Grid */
-  .scoring-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-  .score-item label { display: block; font-weight: bold; margin-bottom: 5px; color: white; font-size: 0.85rem;}
-  
-  .status-badge { padding: 5px 12px; border-radius: 20px; font-weight: bold; font-size: 0.85rem; transition: 0.3s; white-space: nowrap; }
-  .open { background: #FFC107; color: #020C1B; } 
-  .closed { background: white; color: #e74c3c; }
-  
-  #connectionStatus { font-size: 0.85rem; color: #FFC107; font-weight: bold; }
-
-  .log-list { list-style-type: none; padding: 0; margin: 0; font-family: monospace; font-size: 0.9rem; color: #ccc; }
-  .log-list li { padding: 8px 0; border-bottom: 1px dashed #001133; }
-  .log-timestamp { color: #FFC107; margin-right: 10px; }
-
-  /* Slide-in Toast Notifications */
-  #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
-  .toast { background: rgba(0, 20, 60, 0.95); border-left: 4px solid #FFC107; color: white; padding: 15px 20px; border-radius: 4px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); font-size: 0.9rem; 
-           animation: slideIn 1.2s cubic-bezier(0.16, 1, 0.3, 1) forwards, fadeOut 1.2s 5s ease-in forwards; pointer-events: auto; }
-  @keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
-  @keyframes fadeOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
+  .status-badge { padding: 4px 10px; border-radius: 20px; font-weight: bold; font-size: 0.75rem; background: #FFC107; color: #020C1B; margin-top: 5px;}
 
   /* Desktop Adjustments */
   @media(min-width: 768px) {
-    header { flex-direction: row; justify-content: space-between; text-align: left; }
-    .header-content { flex-direction: row; align-items: center; }
-    .header-title-container { flex-direction: row; }
-    .header-actions { width: auto; justify-content: flex-end; }
+    .container { margin: 40px auto; padding: 15px; }
+    header { flex-direction: row; justify-content: center; text-align: left; padding: 15px 20px; }
+    .header-content { flex-direction: row; width: auto; }
+    .header-logo { height: 65px; width: 65px; }
     h1 { font-size: 1.8rem; }
-    .card-header-flex { flex-direction: row; justify-content: space-between; margin-bottom: 10px; }
-    .scoring-grid { grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; }
+    .card { padding: 25px; }
+    h2 { font-size: 2rem; }
+    .subtitle { font-size: 0.95rem; }
+    table { font-size: 1.1rem; }
+    th { font-size: 0.95rem; padding: 15px; }
+    td { padding: 15px; }
   }
-
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 </style>
 </head>
 <body>
 
 <header>
   <div class="header-content">
-    <div class="header-title-container">
-      <img src="4483.jpg" alt="IPS Logo" class="header-logo">
-      <h1>IPS English Presentation Competition</h1>
-    </div>
-    <div class="header-badges">
-      <span id="globalVotingStatus" class="status-badge"></span>
-      <span id="connectionStatus">● Connected Live</span>
-    </div>
-  </div>
-  
-  <div class="header-actions">
-    <div id="authButtons">
-      <button onclick="showLogin()">Login</button>
-    </div>
-    <div id="userMenu" style="display:none; align-items: center; gap: 10px;">
-      <span id="welcomeMsg" style="font-weight: bold; color: white;"></span>
-      <button onclick="logout()" class="danger-btn">Logout</button>
+    <img src="4483.jpg" alt="IPS Logo" class="header-logo">
+    <div style="display: flex; flex-direction: column; align-items: center;">
+        <h1>IPS English Presentation Competition</h1>
+        <span class="status-badge">● Live Server Connection Active</span>
     </div>
   </div>
 </header>
 
 <div class="container">
-  
-  <!-- =============================== -->
-  <!-- 1. PUBLIC LEADERBOARD (HOME) -->
-  <!-- =============================== -->
-  <div id="publicView" class="view-section active-view">
-    <div class="card">
-      <div class="card-header-flex">
-        <h2>🏆 Live Leaderboard</h2>
-        <div style="display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
-          <button class="nav-btn" onclick="toggleAllDetails()">👁 Toggle All Details</button>
-          <button class="nav-btn" onclick="toggleJudgeStats()" style="background: #3498db; color: white; border: 2px solid #2980b9;">📊 Judge Live Stats</button>
-        </div>
-      </div>
-      <div class="table-responsive">
-        <table>
-          <thead>
-            <tr><th>Rank / Prize</th><th>Student Name & Remarks</th><th>Township</th><th>Avg Total (out of 25)</th></tr>
-          </thead>
-          <tbody id="leaderboardBody"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Judge Live Statistics Panel (Hidden by default) -->
-    <div class="card" id="judgeStatsCard" style="display: none; border-color: #3498db; box-shadow: 0 4px 15px rgba(52, 152, 219, 0.3);">
-      <div class="card-header-flex">
-        <h3 style="border-bottom: none; color: #3498db; margin: 0;">📊 Judge Analytics & Bias Tracker</h3>
-        <button class="danger-btn" onclick="toggleJudgeStats()">✖ Close Stats</button>
-      </div>
-      <p style="font-size:0.9rem; color:#ccc; text-align: center; margin-top: 0;">Real-time transparency tracking of points awarded by each active judge.</p>
-      <div class="table-responsive">
-        <table>
-          <thead>
-            <tr style="background: #001133;">
-              <th>Judge Name</th>
-              <th>Students Scored</th>
-              <th>Total Points Given</th>
-              <th>Avg Point (per student)</th>
-              <th>Highest Given</th>
-              <th>Lowest Given</th>
-            </tr>
-          </thead>
-          <tbody id="judgeStatsBody"></tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-
-  <!-- =============================== -->
-  <!-- 2. LOGIN PAGE -->
-  <!-- =============================== -->
-  <div id="loginView" class="view-section">
-    <div class="card" style="max-width: 400px; margin: 0 auto;">
-      <h2>System Login</h2>
-      <label>Password / PIN:</label>
-      <input type="password" id="loginPassword" placeholder="Enter Admin, Judge, or Observer PIN" inputmode="numeric">
-      <button onclick="handleLogin()" style="width: 100%;">Login</button>
-      <button onclick="showView('publicView')" class="danger-btn" style="width: 100%; margin-top: 10px; border: none; background: #555;">Back to Leaderboard</button>
-    </div>
-  </div>
-
-  <!-- =============================== -->
-  <!-- 3. ADMIN PRIVATE ROOM -->
-  <!-- =============================== -->
-  <div id="adminView" class="view-section">
+  <div class="card">
+    <h2>📊 Judge Analytics & Bias Tracker</h2>
+    <p class="subtitle">Real-time transparency board tracking total points, averages, and extremes awarded by each active judge.</p>
     
-    <!-- Prominent Wheel Button -->
-    <div class="card card-header-flex" style="background: rgba(255, 193, 7, 0.1); border-width: 2px;">
-      <div style="text-align: left;">
-        <h3 style="border:none; margin:0; padding:0; font-size: 1.5rem;">Event Tools</h3>
-        <p style="margin:5px 0 0 0; font-size:0.9rem; color:#ccc;">Open the randomizer wheel on the projector.</p>
-      </div>
-      <a href="wheel.html" class="nav-btn" style="font-size: 1.5rem; padding: 15px 40px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">🎡 Open Wheel</a>
-    </div>
-
-    <!-- Voting Controls -->
-    <div class="card card-header-flex" style="background: rgba(0, 20, 60, 0.5);">
-      <div style="text-align: left;">
-        <h3 style="border:none; margin:0; padding:0; font-size: 1.3rem;">Voting Controls</h3>
-        <p style="margin:5px 0 0 0; font-size:0.9rem; color:#ccc;">Turn voting on or off globally.</p>
-      </div>
-      <button id="toggleVotingBtn" onclick="toggleVoting()" class="danger-btn" style="font-size: 1.1rem; padding: 15px 30px;"></button>
-    </div>
-
-    <!-- Visitor Logs -->
-    <div class="card">
-      <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">Visitor Logs (IP & Device)</h3>
-        <button class="nav-btn" onclick="fetchVisitorLogs()">🔄 Load / Refresh Logs</button>
-      </div>
-      <p style="font-size:0.9rem; color:#ccc;">Tracks external visitors. Old logs are automatically deleted to prevent database overload.</p>
-      <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
-        <table style="font-size:0.8rem;">
-          <thead><tr><th>Date & Time</th><th>IP Address</th><th>Device / Browser</th></tr></thead>
-          <tbody id="adminVisitorLogsBody">
-             <tr><td colspan="3" style="text-align:center;">Click 'Load / Refresh Logs' to view data.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Live System Logs -->
-    <div class="card">
-      <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">System Activity Logs</h3>
-        <button class="nav-btn" onclick="exportLogs()">⬇️ Download Logs</button>
-      </div>
-      <div style="max-height: 200px; overflow-y: auto; background: #000022; padding: 15px; border-radius: 8px;">
-        <ul id="adminLogsList" class="log-list"></ul>
-      </div>
-    </div>
-
-    <div style="display: flex; gap: 20px; flex-wrap: wrap; margin-bottom: 20px;">
-      <div class="card" style="flex: 1; min-width: 300px;">
-        <h3>Add Student</h3>
-        <input type="text" id="studentName" placeholder="Student Name">
-        <input type="text" id="studentTownship" placeholder="Township / Branch">
-        <button onclick="addStudent()">Add Student</button>
-      </div>
-      <div class="card" style="flex: 1; min-width: 300px;">
-        <h3>Create Judge</h3>
-        <input type="text" id="judgeName" placeholder="Name (e.g., Judge Mary)">
-        <input type="password" id="judgePassword" maxlength="4" placeholder="Set 4-Digit PIN" inputmode="numeric">
-        <button onclick="addJudge()">Create Judge</button>
-      </div>
-      <div class="card" style="flex: 1; min-width: 300px;">
-        <h3>Create Observer</h3>
-        <p style="font-size:0.8rem; color:#ccc;">Observers can watch live scores and logs securely.</p>
-        <input type="text" id="observerName" placeholder="Name (e.g., Observer John)">
-        <input type="password" id="observerPassword" maxlength="4" placeholder="Set 4-Digit PIN" inputmode="numeric">
-        <button onclick="addObserver()">Create Observer</button>
-      </div>
-    </div>
-
-    <!-- Leaderboard Awards & Remarks -->
-    <div class="card">
-      <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">Manage Awards & Public Remarks</h3>
-      </div>
-      <p style="font-size:0.9rem; color:#ccc;">Manually assign winners (overrides auto-ranking) or add a custom remark below their name.</p>
-      <div class="table-responsive">
-        <table>
-          <thead><tr><th>Student</th><th>Prize Override</th><th>Public Remark</th><th>Action</th></tr></thead>
-          <tbody id="adminAwardsList"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Dynamic Leaderboard Groups Management -->
-    <div class="card">
-      <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">Manage Leaderboard Groups</h3>
-      </div>
-      <p style="font-size:0.9rem; color:#ccc;">Create custom brackets based on grades. Students are auto-sorted based on their (G#) tag.</p>
-      <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
-        <input type="text" id="newGroupName" placeholder="Group Name (e.g., Grade 1 to 4)" style="flex: 1; min-width: 150px;">
-        <input type="number" id="newGroupMin" placeholder="Min Grade (e.g. 1)" style="width: 120px;">
-        <input type="number" id="newGroupMax" placeholder="Max Grade (e.g. 4)" style="width: 120px;">
-        <button onclick="addGroup()">Add Group</button>
-      </div>
-      <div class="table-responsive">
-        <table>
-          <thead><tr><th>Group Name</th><th>Min Grade</th><th>Max Grade</th><th>Actions</th></tr></thead>
-          <tbody id="adminGroupList"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Student Management & Backup with Collapse Button -->
-    <div class="card">
-      <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem; display: flex; align-items: center; gap: 10px;">
-          Manage Students
-          <button id="toggleStudentListBtn" onclick="toggleAdminStudentList()" style="background: rgba(255, 193, 7, 0.1); border: 1px solid #FFC107; color: #FFC107; padding: 2px 10px; font-size: 0.9rem;">▼</button>
-        </h3>
-        <div style="display: flex; gap: 10px;">
-          <button onclick="exportStudents()">⬇️ Backup Students</button>
-          <button onclick="document.getElementById('studentFileInput').click()">⬆️ Import Students</button>
-          <input type="file" id="studentFileInput" accept=".json" style="display: none;" onchange="importStudents(event)">
-        </div>
-      </div>
-      <div class="table-responsive" id="adminStudentTableContainer">
-        <table>
-          <thead><tr><th>Name</th><th>Township</th><th>Action</th></tr></thead>
-          <tbody id="adminStudentList"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Judge Management & Checkbox Restrictions -->
-    <div class="card">
-      <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">Manage Judges & Restrictions</h3>
-        <div style="display: flex; gap: 10px;">
-          <button onclick="exportJudges()">⬇️ Backup Judges</button>
-          <button onclick="document.getElementById('judgeFileInput').click()">⬆️ Import Judges</button>
-          <input type="file" id="judgeFileInput" accept=".json" style="display: none;" onchange="importJudges(event)">
-        </div>
-      </div>
-      <p style="font-size:0.9rem; color:#ccc;">Check the boxes and click <b>Save Profile</b> to lock in restrictions.</p>
-      <div class="table-responsive">
-        <table>
-          <thead><tr><th>Name</th><th>PIN (4-Digits)</th><th>Forbidden Townships (Checkboxes)</th><th>Actions</th></tr></thead>
-          <tbody id="adminJudgeList"></tbody>
-        </table>
-      </div>
-    </div>
-    
-    <!-- Observer Management -->
-    <div class="card">
-      <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">Manage Observers</h3>
-      </div>
-      <div class="table-responsive">
-        <table>
-          <thead><tr><th>Name</th><th>PIN (4-Digits)</th><th>Actions</th></tr></thead>
-          <tbody id="adminObserverList"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Master Voting History & Wipe Test Scores -->
-    <div class="card">
-      <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">Full Master Voting History</h3>
-        <button class="danger-btn" onclick="clearAllScores()">⚠️ Clear All Scores (Test Wipe)</button>
-      </div>
-      <p style="font-size:0.9rem; color:#ccc;">Review every score submitted by every judge. Use the button above to clear all votes after a test run.</p>
-      <div class="table-responsive">
-        <table>
-          <thead>
-            <tr><th>Student</th><th>Judge</th><th>Scores (Pronunciation, Grammar, Fluency, Q&A, Content, Delivery)</th><th>Total</th></tr>
-          </thead>
-          <tbody id="adminVotingHistory"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Admin Security -->
-    <div class="card">
-      <h3>Admin Security</h3>
-      <label style="color: white; font-weight: bold;">Change Admin PIN (4 Digits Only):</label>
-      <div style="display: flex; gap: 10px; margin-top: 5px; flex-wrap: wrap;">
-        <input type="password" id="adminNewPin" maxlength="4" placeholder="Enter new PIN" style="flex: 1; min-width: 150px; margin: 0;" inputmode="numeric">
-        <button onclick="updateAdminPin()" style="white-space: nowrap;">Update Admin PIN</button>
-      </div>
-    </div>
-
-    <!-- Master Database Controls -->
-    <div class="card">
-      <h3>Master Database Actions</h3>
-      <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 15px;">
-        <button onclick="exportBackup()">⬇️ Download Full DB Backup</button>
-        <button onclick="document.getElementById('dbFileInput').click()">⬆️ Restore Full DB Backup</button>
-        <input type="file" id="dbFileInput" accept=".json" style="display: none;" onchange="importBackup(event)">
-      </div>
-      <button class="danger-btn" onclick="clearAllData()" style="width: 100%; padding: 15px;">⚠️ Factory Reset Entire Database</button>
-    </div>
-  </div>
-
-  <!-- =============================== -->
-  <!-- 4. JUDGE PRIVATE ROOM -->
-  <!-- =============================== -->
-  <div id="judgeView" class="view-section">
-    <div class="card">
-      <h2>📝 Submit / Edit Score</h2>
-      <p id="judgeWarning" style="color: #FFC107; font-weight: bold; display: none;">Voting is currently CLOSED by the Admin.</p>
-      
-      <label style="color: white; font-weight: bold;">Select Student:</label>
-      <select id="judgeStudentSelect"></select>
-      
-      <!-- Fixed Dropdown Scoring Grid -->
-      <div class="scoring-grid" style="margin-top: 15px;">
-        <div class="score-item">
-          <label>Pronunciation (5)</label>
-          <select id="s_pron"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select>
-        </div>
-        <div class="score-item">
-          <label>Grammar (3)</label>
-          <select id="s_gram"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
-        </div>
-        <div class="score-item">
-          <label>Fluency (4)</label>
-          <select id="s_flu"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
-        </div>
-        <div class="score-item">
-          <label>Q & A (6)</label>
-          <select id="s_qa"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select>
-        </div>
-        <div class="score-item">
-          <label>Content (3)</label>
-          <select id="s_cont"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
-        </div>
-        <div class="score-item">
-          <label>Delivery (4)</label>
-          <select id="s_deliv"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option></select>
-        </div>
-      </div>
-      
-      <button id="submitScoreBtn" onclick="submitScore()" style="width: 100%; margin-top: 15px; font-size: 1.2rem; padding: 15px;">Submit Score</button>
-    </div>
-
-    <!-- Judge Voting History -->
-    <div class="card">
-      <h3>My Voting History</h3>
-      <div class="table-responsive">
-        <table>
-          <thead>
-            <tr><th>Student</th><th>Total Score</th><th>Details</th><th>Action</th></tr>
-          </thead>
-          <tbody id="judgeHistoryBody"></tbody>
-        </table>
-      </div>
-    </div>
-    
-    <!-- Judge Security -->
-    <div class="card">
-      <h3>Security Setting</h3>
-      <label style="color: white; font-weight: bold;">Change Your PIN (4 Digits Only):</label>
-      <div style="display: flex; gap: 10px; margin-top: 5px; flex-wrap: wrap;">
-        <input type="password" id="judgeNewPin" maxlength="4" placeholder="Enter new PIN" style="flex: 1; min-width: 150px; margin: 0;" inputmode="numeric">
-        <button onclick="updateJudgePin()" style="white-space: nowrap;">Update PIN</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- =============================== -->
-  <!-- 5. OBSERVER PRIVATE ROOM -->
-  <!-- =============================== -->
-  <div id="observerView" class="view-section">
-    <div class="card" style="border-width: 2px;">
-      <h2>👀 Observer Dashboard</h2>
-      <p style="font-size:0.95rem; color:#ccc;">You have secure, read-only access to all system activity, logs, and score submissions in real-time.</p>
-      <button class="nav-btn" onclick="showView('publicView')" style="margin-top: 10px;">Return to Public Leaderboard</button>
-    </div>
-
-    <!-- Read-Only Students List -->
-    <div class="card">
-      <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">Registered Students</h3>
-      </div>
-      <div class="table-responsive">
-        <table>
-          <thead><tr><th>Name</th><th>Township</th></tr></thead>
-          <tbody id="observerStudentList"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Read-Only Judges List -->
-    <div class="card">
-      <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">Registered Judges</h3>
-      </div>
-      <div class="table-responsive">
-        <table>
-          <thead><tr><th>Name</th><th>Forbidden Townships</th></tr></thead>
-          <tbody id="observerJudgeList"></tbody>
-        </table>
-      </div>
-    </div>
-
-    <!-- Live Logs -->
-    <div class="card">
-      <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">Real-Time System Logs</h3>
-      </div>
-      <div style="max-height: 200px; overflow-y: auto; background: #000022; padding: 15px; border-radius: 8px;">
-        <ul id="observerLogsList" class="log-list"></ul>
-      </div>
-    </div>
-
-    <!-- Master Voting History -->
-    <div class="card">
-      <h3>Full Master Voting History</h3>
-      <div class="table-responsive">
-        <table>
-          <thead>
-            <tr><th>Student</th><th>Judge</th><th>Scores (Pronunciation, Grammar, Fluency, Q&A, Content, Delivery)</th><th>Total</th></tr>
-          </thead>
-          <tbody id="observerVotingHistory"></tbody>
-        </table>
-      </div>
+    <div class="table-responsive">
+      <table>
+        <thead>
+          <tr>
+            <th style="text-align: left; min-width: 130px;">ဒိုင်လူကြီးအမည်<br><span style="font-size: 0.7rem; color: #888;">Judge Name</span></th>
+            <th style="min-width: 110px;">အမှတ်ပေးပြီးသော<br>ကျောင်းသားဦးရေ</th>
+            <th style="min-width: 100px;">ပေးခဲ့သော<br>စုစုပေါင်းအမှတ်</th>
+            <th style="min-width: 110px;">ပျမ်းမျှအမှတ်<br>(တစ်ဦးလျှင်)</th>
+            <th style="min-width: 90px;">အမြင့်ဆုံး<br>အမှတ်</th>
+            <th style="min-width: 90px;">အနိမ့်ဆုံး<br>အမှတ်</th>
+          </tr>
+        </thead>
+        <tbody id="judgeStatsBody">
+            <tr><td colspan="6" style="padding: 30px;">Loading Live Data...</td></tr>
+        </tbody>
+      </table>
     </div>
   </div>
 </div>
 
 <script>
   // ==========================================
-  // INJECTED BACK4APP (PARSE) CONFIG
+  // BACK4APP (PARSE) CONFIG
   // ==========================================
   Parse.initialize(
     "KQHogVKClAE7uofUaEr6IswMkNFXENXFktQSGbrR", // Application ID
@@ -555,131 +132,10 @@
   Parse.serverURL = 'https://parseapi.back4app.com/';
   // ==========================================
 
-  const defaultGroups = [
-    { id: 'def1', name: 'Grade 1 to 4', min: 1, max: 4 },
-    { id: 'def2', name: 'Grade 5 & 6', min: 5, max: 6 },
-    { id: 'def3', name: 'Grade 7 and up', min: 7, max: 99 }
-  ];
-
-  let db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000', groups: defaultGroups }, logs: [], presence: {} };
-  let currentUser = null; 
-  let expandedRows = new Set(); 
-  let isJudgeStatsOpen = false;
-  const genId = () => Math.random().toString(36).substr(2, 9);
-  let parseDocId = null;
-
-  // SMART VIRTUAL DOM LOCKS
-  let lastStudentHash = "";
-  let lastJudgeHash = "";
-  let lastObserverHash = "";
-  let lastGroupHash = "";
-  let lastAwardsHash = "";
-  let lastJudgeStudentHash = "";
-  let lastJudgeHistoryHash = "";
-  let lastAdminHistoryHash = "";
-  let lastLeaderboardHash = "";
-  
-  let forceStudentRender = true;
-  let forceJudgeRender = true;
-  let forceObserverRender = true;
-  let forceGroupRender = true;
-  let forceJudgeStudentRender = true;
-  
-  // THE GHOST DATA ASSASSIN
-  window.isSaving = false;
-  window.lastFetchReq = 0;
-
-  // Toast Notification Logic
-  function createToastContainer() {
-    let container = document.getElementById('toast-container');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'toast-container';
-      document.body.appendChild(container);
-    }
-    return container;
-  }
-
-  function showToast(message) {
-    const container = createToastContainer();
-    const toast = document.createElement('div');
-    toast.className = 'toast';
-    toast.innerText = message;
-    container.appendChild(toast);
-    setTimeout(() => toast.remove(), 6000);
-  }
-
-  /* ============================================================== */
-  /* VISITOR TRACKING SYSTEM (CAPPED AT 50) */
-  /* ============================================================== */
-  async function trackVisitor() {
-      if(sessionStorage.getItem('visitorLogged')) return;
-      
-      let ip = "Unknown IP";
-      try {
-          const res = await fetch('https://api.ipify.org?format=json');
-          const data = await res.json();
-          ip = data.ip;
-      } catch(e) {}
-
-      const VisitorLog = Parse.Object.extend("VisitorLog");
-      const log = new VisitorLog();
-      log.set("ip", ip);
-      log.set("device", navigator.userAgent);
-      log.set("time", new Date().toLocaleString());
-      
-      try {
-          await log.save();
-          sessionStorage.setItem('visitorLogged', 'true');
-          
-          const query = new Parse.Query(VisitorLog);
-          query.descending("createdAt");
-          query.skip(50);
-          const oldLogs = await query.find();
-          if(oldLogs.length > 0) {
-              await Parse.Object.destroyAll(oldLogs);
-          }
-      } catch(e) {}
-  }
-  trackVisitor();
-
-  async function fetchVisitorLogs() {
-    const tbody = document.getElementById('adminVisitorLogsBody');
-    if(!tbody) return;
-    tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">Loading logs...</td></tr>';
-    
-    const VisitorLog = Parse.Object.extend("VisitorLog");
-    const query = new Parse.Query(VisitorLog);
-    query.descending("createdAt");
-    query.limit(50);
-    try {
-        const results = await query.find();
-        tbody.innerHTML = '';
-        if(results.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" style="text-align:center;">No visitor logs found.</td></tr>';
-            return;
-        }
-        results.forEach(r => {
-            tbody.innerHTML += `<tr>
-                <td style="white-space:nowrap;">${r.get('time')}</td>
-                <td>${r.get('ip')}</td>
-                <td style="word-break: break-all;">${r.get('device')}</td>
-            </tr>`;
-        });
-        showToast("Visitor logs refreshed successfully.");
-    } catch(e) {
-        tbody.innerHTML = '<tr><td colspan="3" style="text-align:center; color:red;">Error loading logs.</td></tr>';
-    }
-  }
-
-  /* ============================================================== */
+  let db = { students: [], judges: [], scores: {} };
+  let lastHash = "";
 
   async function fetchDb() {
-    if (window.isSaving) return; 
-
-    const currentReq = Date.now();
-    window.lastFetchReq = currentReq;
-
     const AppData = Parse.Object.extend("AppData");
     const query = new Parse.Query(AppData);
     query.descending("createdAt"); 
@@ -688,878 +144,40 @@
     try {
       const results = await query.find();
 
-      if (window.isSaving || window.lastFetchReq !== currentReq) {
-          return; 
-      }
-
       if (results.length > 0) {
-        parseDocId = results[0].id;
         const data = results[0].get("payload");
         if (data) {
           db = {
             students: data.students || [],
             judges: data.judges || [],
-            observers: data.observers || [],
-            scores: data.scores || {},
-            settings: data.settings || { votingOpen: true, adminPin: '0000', groups: defaultGroups },
-            logs: data.logs || [],
-            presence: data.presence || {}
+            scores: data.scores || {}
           };
-          if(!db.settings.adminPin) db.settings.adminPin = '0000';
-          if(!db.settings.groups || db.settings.groups.length === 0) db.settings.groups = defaultGroups;
         }
-      } else {
-        db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000', groups: defaultGroups }, logs: [], presence: {} };
       }
-      updateUI();
-    } catch (error) {}
-  }
-
-  async function saveData(silent = false) { 
-    window.isSaving = true; 
-    window.lastFetchReq = 0; 
-
-    const AppData = Parse.Object.extend("AppData");
-    let obj;
-    
-    if (parseDocId) {
-        obj = new AppData();
-        obj.id = parseDocId;
-    } else {
-        obj = new AppData(); 
-    }
-
-    obj.set("payload", JSON.parse(JSON.stringify(db)));
-    
-    try {
-        const saved = await obj.save();
-        parseDocId = saved.id;
-        setTimeout(() => { window.isSaving = false; }, 800); 
-        if (!silent) showToast("Changes saved successfully!");
+      renderJudgeStats();
     } catch (error) {
-        window.isSaving = false;
-        if (!silent) showToast("Error saving data: " + error.message); 
+      console.error("Back4App connection error: " + error.message);
     }
-  }
-  
-  function pushLog(msg) { db.logs.push({ time: new Date().toLocaleString(), message: msg }); }
-
-  /* ============================================================== */
-  /* ISOLATED PRESENCE TRACKER */
-  /* ============================================================== */
-  async function pingPresence() {
-    if (!currentUser) return;
-    const role = currentUser.role;
-    const name = (role === 'admin' ? 'U Nine Nine - Pakokku' : currentUser.name);
-
-    const Presence = Parse.Object.extend("PresenceTracker");
-    const query = new Parse.Query(Presence);
-    query.equalTo("userName", name);
-    try {
-        let pObj;
-        const results = await query.find();
-        if (results.length > 0) {
-            pObj = results[0];
-        } else {
-            pObj = new Presence();
-            pObj.set("userName", name);
-            pObj.set("role", role);
-        }
-        pObj.set("lastActive", Date.now());
-        await pObj.save(); 
-    } catch(e) {}
-  }
-
-  let lastViewerMsg = "";
-  async function checkViewers() {
-    const Presence = Parse.Object.extend("PresenceTracker");
-    const query = new Parse.Query(Presence);
-    
-    query.greaterThan("lastActive", Date.now() - 60000); 
-    try {
-        const results = await query.find();
-        let count = results.length;
-        let adminWatching = false;
-        let observers = [];
-
-        results.forEach(r => {
-            const role = r.get("role");
-            const name = r.get("userName");
-            if (role === 'admin') adminWatching = true;
-            else if (role === 'observer') observers.push(name);
-        });
-
-        let msg = `👁 ${count} user(s) currently active.`;
-        if (adminWatching) msg += ` Admin is online.`;
-        if (observers.length > 0) msg += ` Logged in: ${observers.join(', ')}.`;
-
-        if (msg !== lastViewerMsg) {
-            showToast(msg);
-            lastViewerMsg = msg;
-        }
-    } catch(e) {}
-  }
-  /* ============================================================== */
-
-  function updateUI() {
-    renderLeaderboard();
-    if (isJudgeStatsOpen) renderJudgeStats();
-    updateHeaderStatus();
-    if (currentUser?.role === 'admin') {
-      renderAdminStudentList();
-      renderAdminJudgeList();
-      renderAdminObserverList();
-      renderAdminGroups();
-      renderAdminAwardsList();
-      updateAdminToggleBtn();
-      renderAdminLogs('adminLogsList');
-      renderAdminHistory('adminVotingHistory'); 
-    }
-    if (currentUser?.role === 'judge') {
-      populateJudgeStudents();
-      renderJudgeHistory();
-      updateJudgeFormState();
-    }
-    if (currentUser?.role === 'observer') {
-      renderObserverStudentList();
-      renderObserverJudgeList();
-      renderAdminLogs('observerLogsList');
-      renderAdminHistory('observerVotingHistory');
-    }
-  }
-
-  function showView(viewId) {
-    document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active-view'));
-    document.getElementById(viewId).classList.add('active-view');
-    updateUI();
-  }
-
-  function showLogin() { showView('loginView'); document.getElementById('loginPassword').value = ''; }
-
-  function handleLogin() {
-    const pwd = document.getElementById('loginPassword').value;
-    const adminPin = db.settings.adminPin || '0000';
-    
-    if (pwd === adminPin) {
-      currentUser = { role: 'admin', name: 'U Nine Nine - Pakokku' };
-      document.getElementById('authButtons').style.display = 'none';
-      document.getElementById('userMenu').style.display = 'flex';
-      document.getElementById('welcomeMsg').innerText = `Admin Access`;
-      pushLog(`Access: Admin (U Nine Nine) logged in.`);
-      showToast(`Welcome back, U Nine Nine.`);
-      forceStudentRender = forceJudgeRender = forceObserverRender = forceGroupRender = true;
-      lastAwardsHash = "";
-      pingPresence();
-      showView('adminView');
-    } else {
-      const judge = db.judges.find(j => j.password === pwd);
-      if (judge) {
-        currentUser = { role: 'judge', id: judge.id, name: judge.name };
-        document.getElementById('authButtons').style.display = 'none';
-        document.getElementById('userMenu').style.display = 'flex';
-        document.getElementById('welcomeMsg').innerText = `Judge: ${judge.name}`;
-        
-        pushLog(`Access: Judge ${judge.name} logged in.`);
-        showToast(`Login Alert: Judge ${judge.name} has joined the session.`);
-        
-        forceJudgeStudentRender = true;
-        pingPresence();
-        showView('judgeView');
-      } else {
-        const observer = (db.observers || []).find(o => o.password === pwd);
-        if (observer) {
-          currentUser = { role: 'observer', id: observer.id, name: observer.name };
-          document.getElementById('authButtons').style.display = 'none';
-          document.getElementById('userMenu').style.display = 'flex';
-          document.getElementById('welcomeMsg').innerText = `Observer: ${observer.name}`;
-          
-          pushLog(`Access: Observer ${observer.name} logged in.`);
-          showToast(`Login Alert: Observer ${observer.name} is watching.`);
-          
-          pingPresence();
-          showView('observerView');
-        } else {
-          showToast("Incorrect PIN!");
-        }
-      }
-    }
-  }
-
-  function logout() { 
-    currentUser = null; 
-    document.getElementById('authButtons').style.display = 'block'; 
-    document.getElementById('userMenu').style.display = 'none'; 
-    showView('publicView'); 
-  }
-
-  function updateHeaderStatus() {
-    const badge = document.getElementById('globalVotingStatus');
-    if (db.settings.votingOpen) { badge.innerText = "Voting: OPEN"; badge.className = "status-badge open"; } 
-    else { badge.innerText = "Voting: CLOSED"; badge.className = "status-badge closed"; }
-  }
-
-  function toggleVoting() { 
-    db.settings.votingOpen = !db.settings.votingOpen; 
-    pushLog(`Status: Admin ${db.settings.votingOpen ? 'OPENED' : 'CLOSED'} system voting.`);
-    saveData(); 
-  }
-  
-  function updateAdminToggleBtn() {
-    const btn = document.getElementById('toggleVotingBtn');
-    btn.className = "danger-btn"; 
-    if (db.settings.votingOpen) { 
-        btn.innerText = "Voting is OPEN - Click to Close"; 
-    } else { 
-        btn.innerText = "Voting is CLOSED - Click to Open"; 
-    }
-  }
-
-  /* TEST MODE WIPE - CLEARS SCORES ONLY */
-  async function clearAllScores() {
-    if (confirm("WARNING 1/2: Do you want to wipe ALL submitted scores? (Use this to clear out test votes).")) {
-      if (confirm("FINAL WARNING 2/2: Are you absolutely sure? This will delete all scores permanently. Students, Judges, Observers, and Passwords will remain intact. Proceed?")) {
-        window.isSaving = true;
-        window.lastFetchReq = 0;
-        
-        db.scores = {}; 
-        
-        pushLog("System: Admin performed a Test Mode Wipe (All scores deleted).");
-        forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = forceGroupRender = true;
-        lastAwardsHash = lastLeaderboardHash = "";
-        
-        await saveData();
-        window.isSaving = false;
-        updateUI();
-        showToast("All scores have been successfully cleared. Ready for the live event!");
-      }
-    }
-  }
-
-  /* AWARDS & REMARKS MANAGEMENT */
-  function renderAdminAwardsList() {
-    const active = document.activeElement;
-    if (active && active.tagName === 'INPUT' && active.id && active.id.startsWith('aRemark_')) return; 
-
-    const newHash = JSON.stringify(db.students);
-    if (lastAwardsHash === newHash) return;
-    lastAwardsHash = newHash;
-
-    const tbody = document.getElementById('adminAwardsList');
-    if(!tbody) return;
-    tbody.innerHTML = '';
-    
-    let sorted = [...db.students].sort((a,b) => a.name.localeCompare(b.name));
-    
-    sorted.forEach(s => {
-        let prize = s.prize || 'Auto';
-        let remark = s.remark || '';
-        tbody.innerHTML += `<tr>
-            <td>${s.name} <span style="color:#aaa; font-size:0.8rem;">(${s.township})</span></td>
-            <td>
-                <select id="aPrize_${s.id}" class="table-input" style="width:130px; font-weight:bold;">
-                    <option value="Auto" ${prize==='Auto'?'selected':''}>Auto Rank</option>
-                    <option value="1st Prize 🏆" ${prize==='1st Prize 🏆'?'selected':''}>1st Prize 🏆</option>
-                    <option value="2nd Prize 🥈" ${prize==='2nd Prize 🥈'?'selected':''}>2nd Prize 🥈</option>
-                    <option value="3rd Prize 🥉" ${prize==='3rd Prize 🥉'?'selected':''}>3rd Prize 🥉</option>
-                    <option value="Declined ❌" ${prize==='Declined ❌'?'selected':''}>Declined ❌</option>
-                    <option value="Consolation 🏅" ${prize==='Consolation 🏅'?'selected':''}>Consolation 🏅</option>
-                </select>
-            </td>
-            <td><input type="text" id="aRemark_${s.id}" class="table-input" value="${remark}" placeholder="e.g. Great confidence!"></td>
-            <td><button onclick="updateAward('${s.id}')">Save</button></td>
-        </tr>`;
-    });
-  }
-
-  function updateAward(id) {
-    const s = db.students.find(x => x.id === id);
-    if (s) {
-        s.prize = document.getElementById(`aPrize_${id}`).value;
-        s.remark = document.getElementById(`aRemark_${id}`).value;
-        pushLog(`System: Admin updated public awards/remarks for '${s.name}'.`);
-        lastLeaderboardHash = ""; 
-        saveData();
-    }
-  }
-
-  /* GROUP MANAGEMENT */
-  function addGroup() {
-    const name = document.getElementById('newGroupName').value;
-    const min = parseInt(document.getElementById('newGroupMin').value);
-    const max = parseInt(document.getElementById('newGroupMax').value);
-
-    if (!name || isNaN(min) || isNaN(max)) return showToast("Please fill in a valid name, min grade, and max grade.");
-    
-    if (!db.settings.groups) db.settings.groups = [];
-    db.settings.groups.push({ id: genId(), name: name, min: min, max: max });
-    
-    pushLog(`System: Admin added leaderboard group '${name}'.`);
-    forceGroupRender = true;
-    lastLeaderboardHash = ""; 
-    saveData();
-    
-    document.getElementById('newGroupName').value = ''; 
-    document.getElementById('newGroupMin').value = ''; 
-    document.getElementById('newGroupMax').value = '';
-  }
-
-  function renderAdminGroups() {
-    const active = document.activeElement;
-    if (active && active.tagName === 'INPUT' && active.id && active.id.startsWith('gInput_')) return; 
-
-    const newHash = JSON.stringify(db.settings.groups || []);
-    if (lastGroupHash === newHash && !forceGroupRender) return;
-    lastGroupHash = newHash;
-    forceGroupRender = false;
-
-    const tbody = document.getElementById('adminGroupList');
-    tbody.innerHTML = '';
-    (db.settings.groups || []).forEach(g => {
-      tbody.innerHTML += `<tr>
-        <td><input type="text" id="gInput_name_${g.id}" class="table-input" value="${g.name}"></td>
-        <td><input type="number" id="gInput_min_${g.id}" class="table-input" value="${g.min}" style="width:70px;"></td>
-        <td><input type="number" id="gInput_max_${g.id}" class="table-input" value="${g.max}" style="width:70px;"></td>
-        <td style="white-space: nowrap;">
-          <button onclick="updateGroup('${g.id}')">Save</button>
-          <button class="danger-btn" onclick="removeGroup('${g.id}')">Delete</button>
-        </td>
-      </tr>`;
-    });
-  }
-
-  function updateGroup(id) {
-    const group = (db.settings.groups || []).find(g => g.id === id);
-    if (group) {
-      group.name = document.getElementById(`gInput_name_${id}`).value;
-      group.min = parseInt(document.getElementById(`gInput_min_${id}`).value) || 0;
-      group.max = parseInt(document.getElementById(`gInput_max_${id}`).value) || 99;
-      
-      pushLog(`System: Admin updated leaderboard group '${group.name}'.`);
-      forceGroupRender = true;
-      lastLeaderboardHash = ""; 
-      saveData();
-    }
-  }
-
-  function removeGroup(id) {
-    if (confirm("Delete this leaderboard group?")) {
-      db.settings.groups = db.settings.groups.filter(g => g.id !== id);
-      pushLog(`System: Admin deleted a leaderboard group.`);
-      forceGroupRender = true;
-      lastLeaderboardHash = ""; 
-      saveData();
-    }
-  }
-
-  /* STUDENT MANAGEMENT */
-  function addStudent() {
-    const name = document.getElementById('studentName').value;
-    const twp = document.getElementById('studentTownship').value;
-    if (!name || !twp) return;
-    db.students.push({ id: genId(), name, township: twp });
-    pushLog(`System: Admin added student '${name}'.`);
-    forceStudentRender = forceJudgeRender = forceJudgeStudentRender = true; 
-    lastAwardsHash = "";
-    saveData();
-    document.getElementById('studentName').value = ''; document.getElementById('studentTownship').value = '';
-  }
-
-  function removeStudent(id) {
-    const student = db.students.find(s => s.id === id);
-    if (student && confirm("Remove this student and all their scores?")) {
-      db.students = db.students.filter(s => s.id !== id);
-      delete db.scores[id];
-      pushLog(`System: Admin deleted student '${student.name}'.`);
-      forceStudentRender = forceJudgeRender = forceJudgeStudentRender = true;
-      lastAwardsHash = "";
-      saveData();
-    }
-  }
-
-  function toggleAdminStudentList() {
-    const container = document.getElementById('adminStudentTableContainer');
-    const btn = document.getElementById('toggleStudentListBtn');
-    if (container.style.display === 'none') {
-      container.style.display = 'block';
-      btn.innerText = '▼';
-    } else {
-      container.style.display = 'none';
-      btn.innerText = '▶';
-    }
-  }
-
-  function renderAdminStudentList() {
-    const newHash = JSON.stringify(db.students);
-    if (lastStudentHash === newHash && !forceStudentRender) return; 
-    lastStudentHash = newHash;
-    forceStudentRender = false;
-
-    const tbody = document.getElementById('adminStudentList');
-    tbody.innerHTML = '';
-    db.students.forEach(s => {
-      tbody.innerHTML += `<tr><td>${s.name}</td><td>${s.township}</td><td><button class="danger-btn" onclick="removeStudent('${s.id}')">Delete</button></td></tr>`;
-    });
-  }
-
-  function exportStudents() {
-    if (!db.students || db.students.length === 0) return showToast("No students to backup.");
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db.students));
-    const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute("href", dataStr);
-    dlAnchorElem.setAttribute("download", `IPS_Students_Backup.json`);
-    dlAnchorElem.click();
-  }
-
-  function importStudents(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        const imported = JSON.parse(e.target.result);
-        if (!Array.isArray(imported)) throw new Error("Invalid format");
-        if (confirm(`Import ${imported.length} students? This will add them to the existing list.`)) {
-          const newStudents = imported.map(s => ({ id: genId(), name: s.name, township: s.township, prize: s.prize||'Auto', remark: s.remark||'' }));
-          db.students = db.students.concat(newStudents);
-          pushLog(`System: Admin imported ${imported.length} students.`);
-          forceStudentRender = forceJudgeRender = forceJudgeStudentRender = true;
-          lastAwardsHash = "";
-          saveData();
-        }
-      } catch (err) { showToast("Error reading student file. Invalid format."); }
-      event.target.value = '';
-    };
-    reader.readAsText(file);
-  }
-
-  /* JUDGE MANAGEMENT */
-  function addJudge() {
-    const name = document.getElementById('judgeName').value;
-    const pwd = document.getElementById('judgePassword').value;
-    const adminPin = db.settings.adminPin || '0000';
-    
-    if (!name || !pwd) return;
-    if (!/^\d{4}$/.test(pwd)) return showToast("PIN must be exactly 4 digits (0-9).");
-    if (pwd === adminPin) return showToast("Cannot use the Admin PIN.");
-    
-    db.judges.push({ id: genId(), name, password: pwd, forbiddenTownships: "" });
-    pushLog(`System: Admin created Judge '${name}'.`);
-    forceJudgeRender = true;
-    saveData();
-    document.getElementById('judgeName').value = ''; document.getElementById('judgePassword').value = '';
-  }
-
-  function renderAdminJudgeList() {
-    const newHash = JSON.stringify(db.judges) + JSON.stringify(db.students);
-    if (lastJudgeHash === newHash && !forceJudgeRender) return;
-    lastJudgeHash = newHash;
-    forceJudgeRender = false;
-
-    const tbody = document.getElementById('adminJudgeList');
-    tbody.innerHTML = '';
-    
-    const allTownships = [...new Set(db.students.map(s => s.township.trim()))].filter(Boolean);
-
-    db.judges.forEach(j => {
-      let currentForb = (j.forbiddenTownships || '').split(',').map(s => s.trim().toLowerCase());
-      
-      let checkboxesHTML = allTownships.map(t => {
-        let isChecked = currentForb.includes(t.toLowerCase()) ? 'checked' : '';
-        return `<label style="display:inline-flex; align-items:center; margin-right:10px; margin-bottom:5px; font-size:0.85rem; color:#ccc; cursor:pointer;">
-                  <input type="checkbox" class="jForbCheck_${j.id}" value="${t}" ${isChecked} style="margin:0 5px 0 0; width:auto; cursor:pointer;"> ${t}
-                </label>`;
-      }).join('');
-      
-      if (allTownships.length === 0) checkboxesHTML = `<span style="font-size:0.8rem; color:#777;">Add students first to generate checklist</span>`;
-
-      tbody.innerHTML += `<tr>
-        <td><input type="text" id="jName_${j.id}" class="table-input" value="${j.name}" style="width:120px;"></td>
-        <td><input type="password" id="jPass_${j.id}" class="table-input" value="${j.password}" maxlength="4" style="width:70px;"></td>
-        <td><div style="display:flex; flex-wrap:wrap; max-width: 300px; padding: 5px 0;">${checkboxesHTML}</div></td>
-        <td style="white-space: nowrap;">
-          <button onclick="updateJudgeProfile('${j.id}')">Save Profile</button>
-          <button class="danger-btn" onclick="removeJudge('${j.id}')">Delete</button>
-        </td>
-      </tr>`;
-    });
-  }
-
-  function updateJudgeProfile(id) {
-    const judge = db.judges.find(j => j.id === id);
-    if(judge) {
-      const newPwd = document.getElementById(`jPass_${id}`).value;
-      if (!/^\d{4}$/.test(newPwd)) return showToast("PIN must be exactly 4 digits.");
-      
-      judge.name = document.getElementById(`jName_${id}`).value;
-      judge.password = newPwd;
-      
-      const checkedBoxes = Array.from(document.querySelectorAll(`.jForbCheck_${id}:checked`)).map(cb => cb.value);
-      judge.forbiddenTownships = checkedBoxes.join(', ');
-
-      pushLog(`System: Admin updated Profile/Restrictions for Judge '${judge.name}'.`);
-      forceJudgeRender = true; 
-      saveData();
-    }
-  }
-
-  function removeJudge(id) {
-    const judge = db.judges.find(j => j.id === id);
-    if(judge && confirm("Delete this judge account? Their previously submitted scores will remain.")) {
-      db.judges = db.judges.filter(j => j.id !== id);
-      pushLog(`System: Admin deleted Judge '${judge.name}'.`);
-      forceJudgeRender = true;
-      saveData();
-    }
-  }
-
-  function exportJudges() {
-    if (!db.judges || db.judges.length === 0) return showToast("No judges to backup.");
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db.judges));
-    const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute("href", dataStr);
-    dlAnchorElem.setAttribute("download", `IPS_Judges_Backup.json`);
-    dlAnchorElem.click();
-  }
-
-  function importJudges(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = function(e) {
-      try {
-        const imported = JSON.parse(e.target.result);
-        if (!Array.isArray(imported)) throw new Error("Invalid format");
-        if (confirm(`Import ${imported.length} judges? This will add them to the existing list.`)) {
-          db.judges = db.judges.concat(imported);
-          pushLog(`System: Admin imported ${imported.length} judges.`);
-          forceJudgeRender = true;
-          saveData();
-        }
-      } catch (err) { showToast("Error reading judge file. Invalid format."); }
-      event.target.value = '';
-    };
-    reader.readAsText(file);
-  }
-
-  /* OBSERVER MANAGEMENT */
-  function addObserver() {
-    const name = document.getElementById('observerName').value;
-    const pwd = document.getElementById('observerPassword').value;
-    const adminPin = db.settings.adminPin || '0000';
-    
-    if (!name || !pwd) return;
-    if (!/^\d{4}$/.test(pwd)) return showToast("PIN must be exactly 4 digits (0-9).");
-    if (pwd === adminPin) return showToast("Cannot use the Admin PIN.");
-    if (!db.observers) db.observers = [];
-    
-    db.observers.push({ id: genId(), name, password: pwd });
-    pushLog(`System: Admin created Observer '${name}'.`);
-    forceObserverRender = true;
-    saveData();
-    document.getElementById('observerName').value = ''; document.getElementById('observerPassword').value = '';
-  }
-
-  function renderAdminObserverList() {
-    const newHash = JSON.stringify(db.observers || []);
-    if (lastObserverHash === newHash && !forceObserverRender) return;
-    lastObserverHash = newHash;
-    forceObserverRender = false;
-
-    const tbody = document.getElementById('adminObserverList');
-    tbody.innerHTML = '';
-    (db.observers || []).forEach(o => {
-      tbody.innerHTML += `<tr>
-        <td>${o.name}</td>
-        <td><input type="password" id="oPass_${o.id}" class="table-input" value="${o.password}" maxlength="4" readonly style="background:transparent; border:none; padding:0; width:50px;"></td>
-        <td><button class="danger-btn" onclick="removeObserver('${o.id}')">Delete</button></td>
-      </tr>`;
-    });
-  }
-
-  function removeObserver(id) {
-    const observer = db.observers.find(o => o.id === id);
-    if(observer && confirm("Delete this observer account?")) {
-      db.observers = db.observers.filter(o => o.id !== id);
-      pushLog(`System: Admin deleted Observer '${observer.name}'.`);
-      forceObserverRender = true;
-      saveData();
-    }
-  }
-
-  /* OBSERVER READ-ONLY RENDERERS */
-  let lastObserverStudentHash = "";
-  function renderObserverStudentList() {
-    const newHash = JSON.stringify(db.students);
-    if (lastObserverStudentHash === newHash) return;
-    lastObserverStudentHash = newHash;
-
-    const tbody = document.getElementById('observerStudentList');
-    if(!tbody) return;
-    tbody.innerHTML = '';
-    if (db.students.length === 0) return tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">No students yet.</td></tr>';
-    db.students.forEach(s => {
-      tbody.innerHTML += `<tr><td>${s.name}</td><td>${s.township}</td></tr>`;
-    });
-  }
-
-  let lastObserverJudgeHash = "";
-  function renderObserverJudgeList() {
-    const newHash = JSON.stringify(db.judges);
-    if (lastObserverJudgeHash === newHash) return;
-    lastObserverJudgeHash = newHash;
-
-    const tbody = document.getElementById('observerJudgeList');
-    if(!tbody) return;
-    tbody.innerHTML = '';
-    if (db.judges.length === 0) return tbody.innerHTML = '<tr><td colspan="2" style="text-align:center;">No judges yet.</td></tr>';
-    db.judges.forEach(j => {
-      tbody.innerHTML += `<tr><td>${j.name}</td><td>${j.forbiddenTownships || 'None'}</td></tr>`;
-    });
-  }
-
-  /* SYSTEM LOGS & MASTER HISTORY */
-  function renderAdminLogs(elementId) {
-    const list = document.getElementById(elementId);
-    if (!list) return;
-    list.innerHTML = '';
-    if (db.logs.length === 0) return list.innerHTML = '<li>No system events logged yet.</li>';
-    [...db.logs].reverse().forEach(log => {
-      list.innerHTML += `<li><span class="log-timestamp">[${log.time}]</span> ${log.message}</li>`;
-    });
-  }
-  
-  function exportLogs() {
-    if (db.logs.length === 0) return showToast("No logs to download.");
-    const logStrings = db.logs.map(l => `[${l.time}] ${l.message}`);
-    const dataStr = "data:text/plain;charset=utf-8," + encodeURIComponent(logStrings.join('\n'));
-    const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute("href", dataStr);
-    dlAnchorElem.setAttribute("download", `IPS_System_Logs.txt`);
-    dlAnchorElem.click();
-  }
-
-  function renderAdminHistory(elementId) {
-    const newHash = JSON.stringify(db.scores) + JSON.stringify(db.judges);
-    if (lastAdminHistoryHash === newHash) return;
-    lastAdminHistoryHash = newHash;
-
-    const tbody = document.getElementById(elementId);
-    if(!tbody) return;
-    tbody.innerHTML = '';
-    let hasVotes = false;
-    db.students.forEach(student => {
-      if (db.scores[student.id]) {
-        Object.keys(db.scores[student.id]).forEach(judgeId => {
-          hasVotes = true;
-          const judge = db.judges.find(j => j.id === judgeId);
-          const s = db.scores[student.id][judgeId];
-          tbody.innerHTML += `<tr>
-            <td>${student.name}</td>
-            <td>${judge ? judge.name : 'Unknown Judge'}</td>
-            <td style="font-size:0.85rem; color:#ccc;">Pronunciation: ${s.pron}, Grammar: ${s.gram}, Fluency: ${s.flu}, Q&A: ${s.qa}, Content: ${s.cont}, Delivery: ${s.deliv}</td>
-            <td style="font-weight:bold; color:#FFC107;">${s.total} / 25</td>
-          </tr>`;
-        });
-      }
-    });
-    if (!hasVotes) tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No votes submitted yet.</td></tr>';
-  }
-
-  /* FULL DB BACKUP / RESET / WIPE */
-  function exportBackup() {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
-    const dlAnchorElem = document.createElement('a');
-    dlAnchorElem.setAttribute("href", dataStr);
-    dlAnchorElem.setAttribute("download", `IPS_DB_Backup.json`);
-    dlAnchorElem.click();
-  }
-
-  function importBackup(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-      try { 
-        db = JSON.parse(e.target.result); 
-        pushLog(`System: Admin restored master database from file.`);
-        forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = forceGroupRender = true;
-        lastAwardsHash = lastLeaderboardHash = "";
-        await saveData(); 
-      } catch (err) { showToast("Error reading file."); }
-    };
-    reader.readAsText(file);
-  }
-
-  async function clearAllData() {
-    if (confirm("WARNING: Deletes all data globally from the cloud! Are you sure?")) {
-      window.isSaving = true; 
-      window.lastFetchReq = 0; 
-      db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000', groups: defaultGroups }, logs: [] };
-      pushLog("System: ALL DATA FACTORY RESET BY ADMIN.");
-      forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = forceGroupRender = true;
-      lastAwardsHash = lastLeaderboardHash = "";
-      
-      try {
-        const AppData = Parse.Object.extend("AppData");
-        const query = new Parse.Query(AppData);
-        const allDocs = await query.find();
-        await Parse.Object.destroyAll(allDocs); 
-      } catch(e) {}
-      
-      parseDocId = null;
-      await saveData();
-      window.isSaving = false;
-    }
-  }
-
-  /* SECURITY PINS */
-  function updateAdminPin() {
-    const newPin = document.getElementById('adminNewPin').value;
-    if (!/^\d{4}$/.test(newPin)) return showToast("PIN must be exactly 4 digits (0-9).");
-    db.settings.adminPin = newPin;
-    pushLog(`Security: Admin changed the Master Admin PIN.`);
-    saveData();
-    document.getElementById('adminNewPin').value = '';
-  }
-
-  function updateJudgePin() {
-    const newPin = document.getElementById('judgeNewPin').value;
-    const adminPin = db.settings.adminPin || '0000';
-    if (!/^\d{4}$/.test(newPin)) return showToast("PIN must be exactly 4 digits (0-9).");
-    if (newPin === adminPin) return showToast("Cannot use the Admin PIN.");
-    const judge = db.judges.find(j => j.id === currentUser.id);
-    if (judge) {
-      judge.password = newPin;
-      pushLog(`Security: Judge '${judge.name}' changed their PIN.`);
-      saveData();
-      document.getElementById('judgeNewPin').value = '';
-    }
-  }
-
-  /* JUDGE SCORING LOGIC */
-  function populateJudgeStudents() {
-    if (!currentUser || currentUser.role !== 'judge') return;
-
-    const judge = db.judges.find(j => j.id === currentUser.id);
-    
-    // Strict Hash Lock prevents flashing.
-    const newHash = JSON.stringify(db.students) + (judge ? judge.forbiddenTownships : "");
-    if (lastJudgeStudentHash === newHash && !forceJudgeStudentRender) return; 
-    lastJudgeStudentHash = newHash;
-    forceJudgeStudentRender = false;
-
-    const select = document.getElementById('judgeStudentSelect');
-    const currentVal = select.value;
-    select.innerHTML = '<option value="">-- Select Student --</option>';
-    
-    const forbiddenList = (judge && judge.forbiddenTownships) 
-      ? judge.forbiddenTownships.split(',').map(s => s.trim().toLowerCase()) 
-      : [];
-
-    db.students.forEach(s => {
-      const studentTownship = s.township.trim().toLowerCase();
-      if (forbiddenList.includes(studentTownship)) {
-        select.innerHTML += `<option value="${s.id}" disabled>🚫 ${s.name} (${s.township}) - RESTRICTED</option>`;
-      } else {
-        select.innerHTML += `<option value="${s.id}">${s.name} (${s.township})</option>`;
-      }
-    });
-    select.value = currentVal;
-  }
-
-  function updateJudgeFormState() {
-    const btn = document.getElementById('submitScoreBtn');
-    const warning = document.getElementById('judgeWarning');
-    if (db.settings.votingOpen) { btn.disabled = false; btn.innerText = "Submit Score"; warning.style.display = 'none'; } 
-    else { btn.disabled = true; btn.innerText = "Voting Closed"; warning.style.display = 'block'; }
-  }
-
-  function submitScore() {
-    if (!db.settings.votingOpen) return showToast("Voting is closed!");
-    const studentId = document.getElementById('judgeStudentSelect').value;
-    if (!studentId) return showToast("Select a student");
-
-    const student = db.students.find(s => s.id === studentId);
-    const judge = db.judges.find(j => j.id === currentUser.id);
-    const forbiddenList = (judge && judge.forbiddenTownships) ? judge.forbiddenTownships.split(',').map(s => s.trim().toLowerCase()) : [];
-    if (student && forbiddenList.includes(student.township.trim().toLowerCase())) return showToast("Restricted from this township.");
-
-    const pron = Number(document.getElementById('s_pron').value);
-    const gram = Number(document.getElementById('s_gram').value);
-    const flu = Number(document.getElementById('s_flu').value);
-    const qa = Number(document.getElementById('s_qa').value);
-    const cont = Number(document.getElementById('s_cont').value);
-    const deliv = Number(document.getElementById('s_deliv').value);
-    const total = pron + gram + flu + qa + cont + deliv;
-
-    const isEdit = !!(db.scores[studentId] && db.scores[studentId][currentUser.id]);
-    const actionText = isEdit ? "updated score" : "submitted new score";
-
-    if (!db.scores[studentId]) db.scores[studentId] = {};
-    db.scores[studentId][currentUser.id] = { pron, gram, flu, qa, cont, deliv, total };
-    
-    pushLog(`Scoring: Judge '${judge.name}' ${actionText} for '${student.name}' (${total}/25).`);
-    saveData();
-    
-    ['pron','gram','flu','qa','cont','deliv'].forEach(id => document.getElementById(`s_${id}`).value = 0);
-    document.getElementById('judgeStudentSelect').value = '';
-  }
-
-  function renderJudgeHistory() {
-    const newHash = JSON.stringify(db.scores);
-    if (lastJudgeHistoryHash === newHash) return;
-    lastJudgeHistoryHash = newHash;
-
-    const tbody = document.getElementById('judgeHistoryBody');
-    tbody.innerHTML = '';
-    db.students.forEach(student => {
-      const s = db.scores[student.id]?.[currentUser.id];
-      if (s) {
-        tbody.innerHTML += `<tr>
-          <td>${student.name}</td>
-          <td style="font-weight:bold; color:#FFC107;">${s.total} / 25</td>
-          <td style="font-size:0.8rem; color:#aaa;">Pronunciation: ${s.pron}, Grammar: ${s.gram}, Fluency: ${s.flu}, Q&A: ${s.qa}, Content: ${s.cont}, Delivery: ${s.deliv}</td>
-          <td><button onclick="editMyScore('${student.id}')" ${!db.settings.votingOpen ? 'disabled' : ''}>Edit</button></td>
-        </tr>`;
-      }
-    });
-  }
-
-  function editMyScore(studentId) {
-    if (!db.settings.votingOpen) return showToast("Voting is closed!");
-    const s = db.scores[studentId][currentUser.id];
-    document.getElementById('judgeStudentSelect').value = studentId;
-    document.getElementById('s_pron').value = s.pron;
-    document.getElementById('s_gram').value = s.gram;
-    document.getElementById('s_flu').value = s.flu;
-    document.getElementById('s_qa').value = s.qa;
-    document.getElementById('s_cont').value = s.cont;
-    document.getElementById('s_deliv').value = s.deliv;
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
-  /* PUBLIC LEADERBOARD & JUDGE STATS */
-  function toggleJudgeStats() {
-    const card = document.getElementById('judgeStatsCard');
-    isJudgeStatsOpen = !isJudgeStatsOpen;
-    card.style.display = isJudgeStatsOpen ? 'block' : 'none';
-    if (isJudgeStatsOpen) renderJudgeStats();
   }
 
   function renderJudgeStats() {
-    if (!isJudgeStatsOpen) return;
+    // Generate a quick hash to prevent the screen from redrawing if no scores have changed
+    const newHash = JSON.stringify(db.judges) + JSON.stringify(db.scores);
+    if (lastHash === newHash) return;
+    lastHash = newHash;
+
     const tbody = document.getElementById('judgeStatsBody');
     tbody.innerHTML = '';
     
     if (db.judges.length === 0) {
-      return tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">No judges registered.</td></tr>';
+      return tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding: 30px;">No judges registered in the system yet.</td></tr>';
     }
 
     db.judges.forEach(judge => {
       let totalScores = 0;
       let totalPoints = 0;
       let highest = 0;
-      let lowest = 25;
+      let lowest = 25; // Max score possible
 
       db.students.forEach(student => {
         if (db.scores[student.id] && db.scores[student.id][judge.id]) {
@@ -1571,143 +189,24 @@
         }
       });
 
-      let avg = totalScores > 0 ? (totalPoints / totalScores).toFixed(2) : 0.00;
+      let avg = totalScores > 0 ? (totalPoints / totalScores).toFixed(2) : "0.00";
       let lowDisplay = totalScores > 0 ? lowest : '-';
       let highDisplay = totalScores > 0 ? highest : '-';
 
       tbody.innerHTML += `<tr>
-        <td style="font-weight:bold; color:#FFC107;">${judge.name}</td>
-        <td>${totalScores}</td>
+        <td class="judge-name">${judge.name}</td>
+        <td class="highlight">${totalScores}</td>
         <td>${totalPoints}</td>
-        <td>${avg}</td>
-        <td>${highDisplay}</td>
-        <td>${lowDisplay}</td>
+        <td class="highlight">${avg}</td>
+        <td style="color: #4caf50; font-weight: bold;">${highDisplay}</td>
+        <td style="color: #e74c3c; font-weight: bold;">${lowDisplay}</td>
       </tr>`;
     });
   }
-
-  function toggleRowDetails(studentId) {
-    if (expandedRows.has(studentId)) expandedRows.delete(studentId); else expandedRows.add(studentId);
-    lastLeaderboardHash = ""; 
-    renderLeaderboard();
-  }
-
-  function toggleAllDetails() {
-    if (expandedRows.size > 0) expandedRows.clear(); else db.students.forEach(s => expandedRows.add(s.id));
-    lastLeaderboardHash = ""; 
-    renderLeaderboard();
-  }
-
-  function renderLeaderboard() {
-    const groupsHash = JSON.stringify(db.settings.groups || []);
-    const newHash = JSON.stringify(db.students) + JSON.stringify(db.scores) + expandedRows.size + groupsHash;
-    if (lastLeaderboardHash === newHash) return;
-    lastLeaderboardHash = newHash;
-
-    const tbody = document.getElementById('leaderboardBody');
-    tbody.innerHTML = '';
-    
-    if (db.students.length === 0) return tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No students yet.</td></tr>';
-
-    let allResults = db.students.map(student => {
-      let scoresObj = db.scores[student.id];
-      let avgScore = 0;
-      let judgeCount = scoresObj ? Object.keys(scoresObj).length : 0;
-      if (judgeCount > 0) {
-        let totalPoints = Object.values(scoresObj).reduce((sum, s) => sum + s.total, 0);
-        avgScore = totalPoints / judgeCount;
-      }
-      
-      let gradeMatch = student.name.match(/\(G(\d+)\)/i);
-      let gradeNum = gradeMatch ? parseInt(gradeMatch[1]) : 0; 
-      
-      return { ...student, score: avgScore, judges: judgeCount, scoresObj, grade: gradeNum };
-    });
-
-    const renderGroup = (groupData, groupName) => {
-      if (groupData.length === 0) return; 
-      
-      tbody.innerHTML += `
-        <tr style="background: #FFC107; color: #020C1B; text-align: center;">
-          <td colspan="4" style="padding: 12px; font-weight: 900; font-size: 1.1rem; text-transform: uppercase; letter-spacing: 1px;">
-            🏆 ${groupName}
-          </td>
-        </tr>
-      `;
-      
-      groupData.forEach((r, index) => {
-        let displayRank = `${index + 1}`;
-        let rClass = '';
-
-        if (index === 0 && r.score > 0) rClass = 'rank-1';
-        else if (index === 1 && r.score > 0) rClass = 'rank-2';
-        else if (index === 2 && r.score > 0) rClass = 'rank-3';
-
-        if (r.prize && r.prize !== 'Auto') {
-            displayRank = r.prize;
-            if (r.prize.includes('1st')) rClass = 'rank-1';
-            else if (r.prize.includes('2nd')) rClass = 'rank-2';
-            else if (r.prize.includes('3rd')) rClass = 'rank-3';
-            else if (r.prize.includes('Declined')) rClass = 'rank-declined';
-        }
-
-        let isExpanded = expandedRows.has(r.id);
-        let remarkHTML = r.remark ? `<br><div style="font-size:0.85rem; color:#4caf50; font-style:italic; margin-top:3px;">💬 ${r.remark}</div>` : '';
-        
-        tbody.innerHTML += `<tr class="student-row ${rClass}" onclick="toggleRowDetails('${r.id}')">
-          <td style="font-weight:bold;">${displayRank}</td>
-          <td>${r.name} <span style="font-size:0.75rem; color:#FFC107; margin-left:10px;">${isExpanded ? '▼ Hide details' : '▶ Show details'}</span>${remarkHTML}</td>
-          <td>${r.township}</td>
-          <td>${r.score.toFixed(2)} <span style="font-size:0.8rem;color:#aaa;">(${r.judges} votes)</span></td>
-        </tr>`;
-
-        if (isExpanded) {
-          let detailsHTML = `<tr><td colspan="4" class="details-container">
-            <table class="details-table">
-              <thead><tr><th>Judge</th><th>Pronunciation (5)</th><th>Grammar (3)</th><th>Fluency (4)</th><th>Q&A (6)</th><th>Content (3)</th><th>Delivery (4)</th><th>Total (25)</th></tr></thead>
-              <tbody>`;
-          
-          if (r.scoresObj && Object.keys(r.scoresObj).length > 0) {
-            Object.keys(r.scoresObj).forEach(judgeId => {
-              const judge = db.judges.find(j => j.id === judgeId);
-              const jName = judge ? judge.name : 'Unknown';
-              const s = r.scoresObj[judgeId];
-              detailsHTML += `<tr>
-                <td style="font-weight:bold; color:#FFC107;">${jName}</td>
-                <td>${s.pron}</td><td>${s.gram}</td><td>${s.flu}</td><td>${s.qa}</td><td>${s.cont}</td><td>${s.deliv}</td>
-                <td style="font-weight:bold; color:white;">${s.total}</td>
-              </tr>`;
-            });
-          } else {
-            detailsHTML += `<tr><td colspan="8" style="text-align:center; color:#aaa;">No scores submitted yet.</td></tr>`;
-          }
-          detailsHTML += `</tbody></table></td></tr>`;
-          tbody.innerHTML += detailsHTML;
-        }
-      });
-    };
-
-    let activeGroups = db.settings.groups || [];
-    let categorizedIds = new Set();
-
-    if (activeGroups.length > 0) {
-      let sortedGroups = [...activeGroups].sort((a, b) => a.min - b.min);
-      sortedGroups.forEach(g => {
-        let groupStudents = allResults.filter(r => r.grade >= g.min && r.grade <= g.max).sort((a, b) => b.score - a.score);
-        groupStudents.forEach(s => categorizedIds.add(s.id));
-        renderGroup(groupStudents, g.name);
-      });
-    }
-
-    let uncategorized = allResults.filter(r => !categorizedIds.has(r.id)).sort((a, b) => b.score - a.score);
-    if (uncategorized.length > 0) {
-      renderGroup(uncategorized, activeGroups.length === 0 ? "All Students" : "Uncategorized (Missing or Unknown Grade)");
-    }
-  }
   
-  // Real-time Master DB listener
-  setInterval(fetchDb, 3000);
+  // Pull data immediately, then set up the 3-second live refresh loop
   fetchDb();
+  setInterval(fetchDb, 3000);
 
 </script>
 </body>
