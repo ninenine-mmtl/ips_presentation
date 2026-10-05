@@ -825,7 +825,10 @@
     document.getElementById('publicEventDate').innerText = db.settings.eventDate || '';
     
     if (currentUser?.role === 'admin') {
-      document.getElementById('adminEventDate').value = db.settings.eventDate || '';
+      // Focus protection so typing isn't wiped by 3-second refresh
+      if (document.activeElement !== document.getElementById('adminEventDate')) {
+          document.getElementById('adminEventDate').value = db.settings.eventDate || '';
+      }
       renderAdminStudentList();
       renderAdminJudgeList();
       renderAdminObserverList();
@@ -1100,6 +1103,18 @@
       forceStudentRender = forceJudgeRender = forceJudgeStudentRender = true;
       lastAwardsHash = "";
       saveData();
+    }
+  }
+
+  function toggleAdminStudentList() {
+    const container = document.getElementById('adminStudentTableContainer');
+    const btn = document.getElementById('toggleStudentListBtn');
+    if (container.style.display === 'none') {
+      container.style.display = 'block';
+      btn.innerText = '▼';
+    } else {
+      container.style.display = 'none';
+      btn.innerText = '▶';
     }
   }
 
@@ -1426,37 +1441,6 @@
     }
   }
 
-  async function publicWipeData() {
-    const pin = prompt("Enter Admin PIN to authorize system wipe:");
-    const adminPin = db.settings.adminPin || '0000';
-    
-    if (pin === adminPin) {
-      if (confirm("STEP 2: ALL DATA WILL BE DELETED GLOABLLY. Are you absolutely sure?")) {
-        if (confirm("FINAL WARNING: Click OK to factory reset the entire database. This cannot be undone.")) {
-          window.isSaving = true;
-          window.lastFetchReq = 0;
-          db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin, eventDate: db.settings.eventDate || '', groups: defaultGroups }, logs: [] };
-          pushLog("System: ALL DATA FACTORY RESET FROM PUBLIC PAGE.");
-          forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = forceGroupRender = true;
-          lastAwardsHash = lastLeaderboardHash = "";
-          
-          try {
-            const AppData = Parse.Object.extend("AppData");
-            const query = new Parse.Query(AppData);
-            const allDocs = await query.find();
-            await Parse.Object.destroyAll(allDocs); 
-          } catch(e) {}
-
-          parseDocId = null;
-          await saveData();
-          window.isSaving = false;
-        }
-      }
-    } else if (pin !== null) {
-      showToast("Access Denied: Incorrect PIN.");
-    }
-  }
-
   /* SECURITY PINS */
   function updateAdminPin() {
     const newPin = document.getElementById('adminNewPin').value;
@@ -1654,7 +1638,7 @@
         let rowStyle = '';
         let prizeLogo = '';
 
-        // Default Auto Ranking Logic
+        // Default Auto Ranking Highlight
         if (index === 0 && r.score > 0) { rClass = 'rank-1'; rowStyle = 'background: rgba(255, 215, 0, 0.1); border-left: 4px solid #FFD700;'; prizeLogo = '🏆'; }
         else if (index === 1 && r.score > 0) { rClass = 'rank-2'; rowStyle = 'background: rgba(192, 192, 192, 0.1); border-left: 4px solid #C0C0C0;'; prizeLogo = '🥈'; }
         else if (index === 2 && r.score > 0) { rClass = 'rank-3'; rowStyle = 'background: rgba(205, 127, 50, 0.1); border-left: 4px solid #CD7F32;'; prizeLogo = '🥉'; }
