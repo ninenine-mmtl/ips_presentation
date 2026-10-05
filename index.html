@@ -86,9 +86,9 @@
   .student-row { cursor: pointer; transition: background 0.2s; }
   .student-row:hover { background: rgba(255,255,255,0.1) !important; }
   
-  .rank-1 { color: #FFC107; font-weight: bold; }
-  .rank-2 { color: white; font-weight: bold; }
-  .rank-3 { color: #cd7f32; font-weight: bold; }
+  .rank-1 { color: #FFD700; font-weight: bold; }
+  .rank-2 { color: #C0C0C0; font-weight: bold; }
+  .rank-3 { color: #CD7F32; font-weight: bold; }
   .rank-declined { color: #e74c3c; font-weight: bold; }
 
   .details-container { padding: 0 !important; border-bottom: 2px solid #FFC107 !important; }
@@ -137,7 +137,11 @@
   <div class="header-content">
     <div class="header-title-container">
       <img src="4483.jpg" alt="IPS Logo" class="header-logo">
-      <h1>IPS English Presentation Competition</h1>
+      <div>
+        <h1>IPS English Presentation Competition</h1>
+        <!-- Dynamic Event Date displays here -->
+        <div id="publicEventDate" style="color: #FFC107; font-size: 0.95rem; margin-top: 5px; font-weight:bold; letter-spacing: 0.5px;"></div>
+      </div>
     </div>
     <div class="header-badges">
       <span id="globalVotingStatus" class="status-badge"></span>
@@ -198,13 +202,25 @@
   <!-- =============================== -->
   <div id="adminView" class="view-section">
     
-    <!-- Prominent Wheel Button -->
+    <!-- Prominent Wheel & Event Tools -->
     <div class="card card-header-flex" style="background: rgba(255, 193, 7, 0.1); border-width: 2px;">
-      <div style="text-align: left;">
-        <h3 style="border:none; margin:0; padding:0; font-size: 1.5rem;">Event Tools</h3>
-        <p style="margin:5px 0 0 0; font-size:0.9rem; color:#ccc;">Open the randomizer wheel on the projector.</p>
+      <div style="text-align: left; width: 100%;">
+        <div style="display:flex; justify-content: space-between; align-items:center; flex-wrap:wrap; gap:15px;">
+            <div>
+                <h3 style="border:none; margin:0; padding:0; font-size: 1.5rem;">Event Tools & Date</h3>
+                <p style="margin:5px 0 0 0; font-size:0.9rem; color:#ccc;">Open the randomizer wheel or set the public event date.</p>
+            </div>
+            <a href="wheel.html" class="nav-btn" style="font-size: 1.2rem; padding: 12px 30px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">🎡 Open Wheel</a>
+        </div>
+        <!-- Dynamic Event Date Input -->
+        <div style="margin-top: 15px; border-top: 1px dashed #FFC107; padding-top: 15px;">
+            <label style="color: white; font-weight: bold;">Set Event Date (Shows on Homepage):</label>
+            <div style="display: flex; gap: 10px; margin-top: 5px;">
+              <input type="text" id="adminEventDate" placeholder="e.g., October 15, 2026" style="flex: 1; max-width: 300px;">
+              <button onclick="updateEventDate()">Save Date</button>
+            </div>
+        </div>
       </div>
-      <a href="wheel.html" class="nav-btn" style="font-size: 1.5rem; padding: 15px 40px; box-shadow: 0 4px 10px rgba(0,0,0,0.5);">🎡 Open Wheel</a>
     </div>
 
     <!-- Voting Controls -->
@@ -216,7 +232,7 @@
       <button id="toggleVotingBtn" onclick="toggleVoting()" style="font-size: 1.1rem; padding: 15px 30px;"></button>
     </div>
 
-    <!-- Visitor Logs (NEW) -->
+    <!-- Visitor Logs -->
     <div class="card">
       <div class="card-header-flex">
         <h3 style="border:none; margin:0; font-size: 1.3rem;">Visitor Logs (IP & Device)</h3>
@@ -233,14 +249,19 @@
       </div>
     </div>
 
-    <!-- Live System Logs -->
+    <!-- Live System Logs with Fold Button -->
     <div class="card">
       <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">System Activity Logs</h3>
+        <h3 style="border:none; margin:0; font-size: 1.3rem; display: flex; align-items: center; gap: 10px;">
+          System Activity Logs
+          <button id="toggleLogsBtn" onclick="toggleSection('adminLogsContainer', 'toggleLogsBtn')" style="background: rgba(255, 193, 7, 0.1); border: 1px solid #FFC107; color: #FFC107; padding: 2px 10px; font-size: 0.9rem;">▼</button>
+        </h3>
         <button class="nav-btn" onclick="exportLogs()">⬇️ Download Logs</button>
       </div>
-      <div style="max-height: 200px; overflow-y: auto; background: #000022; padding: 15px; border-radius: 8px;">
-        <ul id="adminLogsList" class="log-list"></ul>
+      <div id="adminLogsContainer" style="display: block;">
+        <div style="max-height: 200px; overflow-y: auto; background: #000022; padding: 15px; border-radius: 8px;">
+          <ul id="adminLogsList" class="log-list"></ul>
+        </div>
       </div>
     </div>
 
@@ -300,12 +321,12 @@
       </div>
     </div>
 
-    <!-- Student Management & Backup -->
+    <!-- Student Management & Backup with Fold Button -->
     <div class="card">
       <div class="card-header-flex">
         <h3 style="border:none; margin:0; font-size: 1.3rem; display: flex; align-items: center; gap: 10px;">
           Manage Students
-          <button id="toggleStudentListBtn" onclick="toggleAdminStudentList()" style="background: rgba(255, 193, 7, 0.1); border: 1px solid #FFC107; color: #FFC107; padding: 2px 10px; font-size: 0.9rem;">▼</button>
+          <button id="toggleStudentListBtn" onclick="toggleSection('adminStudentTableContainer', 'toggleStudentListBtn')" style="background: rgba(255, 193, 7, 0.1); border: 1px solid #FFC107; color: #FFC107; padding: 2px 10px; font-size: 0.9rem;">▼</button>
         </h3>
         <div style="display: flex; gap: 10px;">
           <button onclick="exportStudents()">⬇️ Backup Students</button>
@@ -313,7 +334,7 @@
           <input type="file" id="studentFileInput" accept=".json" style="display: none;" onchange="importStudents(event)">
         </div>
       </div>
-      <div class="table-responsive" id="adminStudentTableContainer">
+      <div class="table-responsive" id="adminStudentTableContainer" style="display: block;">
         <table>
           <thead><tr><th>Name</th><th>Township</th><th>Action</th></tr></thead>
           <tbody id="adminStudentList"></tbody>
@@ -321,10 +342,13 @@
       </div>
     </div>
 
-    <!-- Judge Management & Checkbox Restrictions -->
+    <!-- Judge Management & Checkbox Restrictions with Fold Button -->
     <div class="card">
       <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">Manage Judges & Restrictions</h3>
+        <h3 style="border:none; margin:0; font-size: 1.3rem; display: flex; align-items: center; gap: 10px;">
+          Manage Judges
+          <button id="toggleJudgeListBtn" onclick="toggleSection('adminJudgeTableContainer', 'toggleJudgeListBtn')" style="background: rgba(255, 193, 7, 0.1); border: 1px solid #FFC107; color: #FFC107; padding: 2px 10px; font-size: 0.9rem;">▼</button>
+        </h3>
         <div style="display: flex; gap: 10px;">
           <button onclick="exportJudges()">⬇️ Backup Judges</button>
           <button onclick="document.getElementById('judgeFileInput').click()">⬆️ Import Judges</button>
@@ -332,7 +356,7 @@
         </div>
       </div>
       <p style="font-size:0.9rem; color:#ccc;">Check the boxes and click <b>Save Profile</b> to lock in restrictions.</p>
-      <div class="table-responsive">
+      <div class="table-responsive" id="adminJudgeTableContainer" style="display: block;">
         <table>
           <thead><tr><th>Name</th><th>PIN (4-Digits)</th><th>Forbidden Townships (Checkboxes)</th><th>Actions</th></tr></thead>
           <tbody id="adminJudgeList"></tbody>
@@ -353,14 +377,17 @@
       </div>
     </div>
 
-    <!-- Master Voting History & Wipe Test Scores -->
+    <!-- Master Voting History & Wipe Test Scores with Fold Button -->
     <div class="card">
       <div class="card-header-flex">
-        <h3 style="border:none; margin:0; font-size: 1.3rem;">Full Master Voting History</h3>
+        <h3 style="border:none; margin:0; font-size: 1.3rem; display: flex; align-items: center; gap: 10px;">
+          Full Voting History
+          <button id="toggleHistoryBtn" onclick="toggleSection('adminHistoryTableContainer', 'toggleHistoryBtn')" style="background: rgba(255, 193, 7, 0.1); border: 1px solid #FFC107; color: #FFC107; padding: 2px 10px; font-size: 0.9rem;">▼</button>
+        </h3>
         <button class="danger-btn" onclick="clearAllScores()">⚠️ Clear All Scores (Test Wipe)</button>
       </div>
       <p style="font-size:0.9rem; color:#ccc;">Review every score submitted by every judge. Use the button above to clear all votes after a test run.</p>
-      <div class="table-responsive">
+      <div class="table-responsive" id="adminHistoryTableContainer" style="display: block;">
         <table>
           <thead>
             <tr><th>Student</th><th>Judge</th><th>Scores (Pronunciation, Grammar, Fluency, Q&A, Content, Delivery)</th><th>Total</th></tr>
@@ -537,7 +564,7 @@
     { id: 'def3', name: 'Grade 7 and up', min: 7, max: 99 }
   ];
 
-  let db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000', groups: defaultGroups }, logs: [], presence: {} };
+  let db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000', eventDate: '', groups: defaultGroups }, logs: [], presence: {} };
   let currentUser = null; 
   let expandedRows = new Set(); 
   const genId = () => Math.random().toString(36).substr(2, 9);
@@ -563,6 +590,19 @@
   // THE GHOST DATA ASSASSIN
   window.isSaving = false;
   window.lastFetchReq = 0;
+
+  // Reusable Section Toggle
+  function toggleSection(containerId, btnId) {
+    const container = document.getElementById(containerId);
+    const btn = document.getElementById(btnId);
+    if (container.style.display === 'none') {
+      container.style.display = 'block';
+      btn.innerText = '▼';
+    } else {
+      container.style.display = 'none';
+      btn.innerText = '▶';
+    }
+  }
 
   // Toast Notification Logic
   function createToastContainer() {
@@ -607,7 +647,6 @@
           await log.save();
           sessionStorage.setItem('visitorLogged', 'true');
           
-          // Prevents database overload by clipping old logs
           const query = new Parse.Query(VisitorLog);
           query.descending("createdAt");
           query.skip(50);
@@ -677,15 +716,16 @@
             judges: data.judges || [],
             observers: data.observers || [],
             scores: data.scores || {},
-            settings: data.settings || { votingOpen: true, adminPin: '0000', groups: defaultGroups },
+            settings: data.settings || { votingOpen: true, adminPin: '0000', eventDate: '', groups: defaultGroups },
             logs: data.logs || [],
             presence: data.presence || {}
           };
           if(!db.settings.adminPin) db.settings.adminPin = '0000';
           if(!db.settings.groups || db.settings.groups.length === 0) db.settings.groups = defaultGroups;
+          if(!db.settings.eventDate) db.settings.eventDate = "";
         }
       } else {
-        db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000', groups: defaultGroups }, logs: [], presence: {} };
+        db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: '0000', eventDate: '', groups: defaultGroups }, logs: [], presence: {} };
       }
       updateUI();
     } catch (error) {}
@@ -780,7 +820,12 @@
   function updateUI() {
     renderLeaderboard();
     updateHeaderStatus();
+    
+    // Set public event date
+    document.getElementById('publicEventDate').innerText = db.settings.eventDate || '';
+    
     if (currentUser?.role === 'admin') {
+      document.getElementById('adminEventDate').value = db.settings.eventDate || '';
       renderAdminStudentList();
       renderAdminJudgeList();
       renderAdminObserverList();
@@ -887,6 +932,13 @@
     } else { 
         btn.innerText = "Voting is CLOSED - Click to Open"; 
     }
+  }
+
+  function updateEventDate() {
+    db.settings.eventDate = document.getElementById('adminEventDate').value;
+    pushLog(`System: Admin updated the event date.`);
+    lastLeaderboardHash = ""; // Force public board to redraw
+    saveData();
   }
 
   /* TEST MODE WIPE - CLEARS SCORES ONLY */
@@ -1051,18 +1103,6 @@
     }
   }
 
-  function toggleAdminStudentList() {
-    const container = document.getElementById('adminStudentTableContainer');
-    const btn = document.getElementById('toggleStudentListBtn');
-    if (container.style.display === 'none') {
-      container.style.display = 'block';
-      btn.innerText = '▼';
-    } else {
-      container.style.display = 'none';
-      btn.innerText = '▶';
-    }
-  }
-
   function renderAdminStudentList() {
     const newHash = JSON.stringify(db.students);
     if (lastStudentHash === newHash && !forceStudentRender) return; 
@@ -1222,8 +1262,7 @@
     const pwd = document.getElementById('observerPassword').value;
     const adminPin = db.settings.adminPin || '0000';
     
-    if (!name || !pwd) return;
-    if (!/^\d{4}$/.test(pwd)) return showToast("PIN must be exactly 4 digits (0-9).");
+    if (!name || !pwd) return showToast("PIN must be exactly 4 digits (0-9).");
     if (pwd === adminPin) return showToast("Cannot use the Admin PIN.");
     if (!db.observers) db.observers = [];
     
@@ -1369,7 +1408,7 @@
     if (confirm("WARNING: Deletes all data globally from the cloud! Are you sure?")) {
       window.isSaving = true; 
       window.lastFetchReq = 0; 
-      db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000', groups: defaultGroups }, logs: [] };
+      db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: db.settings.adminPin || '0000', eventDate: db.settings.eventDate || '', groups: defaultGroups }, logs: [] };
       pushLog("System: ALL DATA FACTORY RESET BY ADMIN.");
       forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = forceGroupRender = true;
       lastAwardsHash = lastLeaderboardHash = "";
@@ -1384,6 +1423,37 @@
       parseDocId = null;
       await saveData();
       window.isSaving = false;
+    }
+  }
+
+  async function publicWipeData() {
+    const pin = prompt("Enter Admin PIN to authorize system wipe:");
+    const adminPin = db.settings.adminPin || '0000';
+    
+    if (pin === adminPin) {
+      if (confirm("STEP 2: ALL DATA WILL BE DELETED GLOABLLY. Are you absolutely sure?")) {
+        if (confirm("FINAL WARNING: Click OK to factory reset the entire database. This cannot be undone.")) {
+          window.isSaving = true;
+          window.lastFetchReq = 0;
+          db = { students: [], judges: [], observers: [], scores: {}, settings: { votingOpen: true, adminPin: adminPin, eventDate: db.settings.eventDate || '', groups: defaultGroups }, logs: [] };
+          pushLog("System: ALL DATA FACTORY RESET FROM PUBLIC PAGE.");
+          forceStudentRender = forceJudgeRender = forceObserverRender = forceJudgeStudentRender = forceGroupRender = true;
+          lastAwardsHash = lastLeaderboardHash = "";
+          
+          try {
+            const AppData = Parse.Object.extend("AppData");
+            const query = new Parse.Query(AppData);
+            const allDocs = await query.find();
+            await Parse.Object.destroyAll(allDocs); 
+          } catch(e) {}
+
+          parseDocId = null;
+          await saveData();
+          window.isSaving = false;
+        }
+      }
+    } else if (pin !== null) {
+      showToast("Access Denied: Incorrect PIN.");
     }
   }
 
@@ -1513,7 +1583,7 @@
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  /* PUBLIC LEADERBOARD (DYNAMIC GROUPS & MANUAL PRIZES) */
+  /* PUBLIC LEADERBOARD (DYNAMIC GROUPS & HIGHLIGHTS) */
   function toggleRowDetails(studentId) {
     if (expandedRows.has(studentId)) expandedRows.delete(studentId); else expandedRows.add(studentId);
     lastLeaderboardHash = ""; 
@@ -1536,6 +1606,21 @@
     tbody.innerHTML = '';
     
     if (db.students.length === 0) return tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;">No students yet.</td></tr>';
+
+    const getPrizeWeight = (prize) => {
+      if (prize === '1st Prize 🏆') return 1;
+      if (prize === '2nd Prize 🥈') return 2;
+      if (prize === '3rd Prize 🥉') return 3;
+      if (prize === 'Consolation 🏅') return 4;
+      return 5; 
+    };
+
+    const sortStudents = (a, b) => {
+      let wA = getPrizeWeight(a.prize || 'Auto');
+      let wB = getPrizeWeight(b.prize || 'Auto');
+      if (wA !== wB) return wA - wB; 
+      return b.score - a.score; 
+    };
 
     let allResults = db.students.map(student => {
       let scoresObj = db.scores[student.id];
@@ -1566,29 +1651,34 @@
       groupData.forEach((r, index) => {
         let displayRank = `${index + 1}`;
         let rClass = '';
+        let rowStyle = '';
+        let prizeLogo = '';
 
-        // Default Auto Ranking Highlight
-        if (index === 0 && r.score > 0) rClass = 'rank-1';
-        else if (index === 1 && r.score > 0) rClass = 'rank-2';
-        else if (index === 2 && r.score > 0) rClass = 'rank-3';
+        // Default Auto Ranking Logic
+        if (index === 0 && r.score > 0) { rClass = 'rank-1'; rowStyle = 'background: rgba(255, 215, 0, 0.1); border-left: 4px solid #FFD700;'; prizeLogo = '🏆'; }
+        else if (index === 1 && r.score > 0) { rClass = 'rank-2'; rowStyle = 'background: rgba(192, 192, 192, 0.1); border-left: 4px solid #C0C0C0;'; prizeLogo = '🥈'; }
+        else if (index === 2 && r.score > 0) { rClass = 'rank-3'; rowStyle = 'background: rgba(205, 127, 50, 0.1); border-left: 4px solid #CD7F32;'; prizeLogo = '🥉'; }
 
         // Override with Manual Awards
         if (r.prize && r.prize !== 'Auto') {
-            displayRank = r.prize;
-            if (r.prize.includes('1st')) rClass = 'rank-1';
-            else if (r.prize.includes('2nd')) rClass = 'rank-2';
-            else if (r.prize.includes('3rd')) rClass = 'rank-3';
-            else if (r.prize.includes('Declined')) rClass = 'rank-declined';
+            if (r.prize.includes('1st')) { rClass = 'rank-1'; rowStyle = 'background: rgba(255, 215, 0, 0.15); border-left: 4px solid #FFD700;'; prizeLogo = '🏆'; displayRank = '1st Prize'; }
+            else if (r.prize.includes('2nd')) { rClass = 'rank-2'; rowStyle = 'background: rgba(192, 192, 192, 0.15); border-left: 4px solid #C0C0C0;'; prizeLogo = '🥈'; displayRank = '2nd Prize'; }
+            else if (r.prize.includes('3rd')) { rClass = 'rank-3'; rowStyle = 'background: rgba(205, 127, 50, 0.15); border-left: 4px solid #CD7F32;'; prizeLogo = '🥉'; displayRank = '3rd Prize'; }
+            else if (r.prize.includes('Declined')) { rClass = 'rank-declined'; rowStyle = 'background: rgba(231, 76, 60, 0.1); border-left: 4px solid #e74c3c;'; prizeLogo = '❌'; displayRank = 'Declined'; }
+            else if (r.prize.includes('Consolation')) { rowStyle = 'background: rgba(255, 255, 255, 0.1); border-left: 4px solid #fff;'; prizeLogo = '🏅'; displayRank = 'Consolation'; }
         }
 
         let isExpanded = expandedRows.has(r.id);
         let remarkHTML = r.remark ? `<br><div style="font-size:0.85rem; color:#4caf50; font-style:italic; margin-top:3px;">💬 ${r.remark}</div>` : '';
         
-        tbody.innerHTML += `<tr class="student-row ${rClass}" onclick="toggleRowDetails('${r.id}')">
-          <td style="font-weight:bold;">${displayRank}</td>
-          <td>${r.name} <span style="font-size:0.75rem; color:#FFC107; margin-left:10px;">${isExpanded ? '▼ Hide details' : '▶ Show details'}</span>${remarkHTML}</td>
-          <td>${r.township}</td>
-          <td>${r.score.toFixed(2)} <span style="font-size:0.8rem;color:#aaa;">(${r.judges} votes)</span></td>
+        tbody.innerHTML += `<tr class="student-row ${rClass}" style="${rowStyle}" onclick="toggleRowDetails('${r.id}')">
+          <td style="text-align:center; vertical-align:middle;">
+             ${prizeLogo ? `<div style="font-size: 2.2rem; margin-bottom: 5px; line-height: 1;">${prizeLogo}</div>` : ''}
+             <div style="font-weight:bold; font-size: ${prizeLogo ? '0.85rem' : '1.1rem'};">${displayRank}</div>
+          </td>
+          <td style="vertical-align:middle;">${r.name} <span style="font-size:0.75rem; color:#FFC107; margin-left:10px;">${isExpanded ? '▼ Hide details' : '▶ Show details'}</span>${remarkHTML}</td>
+          <td style="vertical-align:middle;">${r.township}</td>
+          <td style="vertical-align:middle;">${r.score.toFixed(2)} <span style="font-size:0.8rem;color:#aaa;">(${r.judges} votes)</span></td>
         </tr>`;
 
         if (isExpanded) {
@@ -1623,14 +1713,13 @@
     if (activeGroups.length > 0) {
       let sortedGroups = [...activeGroups].sort((a, b) => a.min - b.min);
       sortedGroups.forEach(g => {
-        let groupStudents = allResults.filter(r => r.grade >= g.min && r.grade <= g.max).sort((a, b) => b.score - a.score);
+        let groupStudents = allResults.filter(r => r.grade >= g.min && r.grade <= g.max).sort(sortStudents);
         groupStudents.forEach(s => categorizedIds.add(s.id));
         renderGroup(groupStudents, g.name);
       });
     }
 
-    // Catch any students whose grade doesn't fit into the dynamic ranges (or lacks a tag)
-    let uncategorized = allResults.filter(r => !categorizedIds.has(r.id)).sort((a, b) => b.score - a.score);
+    let uncategorized = allResults.filter(r => !categorizedIds.has(r.id)).sort(sortStudents);
     if (uncategorized.length > 0) {
       renderGroup(uncategorized, activeGroups.length === 0 ? "All Students" : "Uncategorized (Missing or Unknown Grade)");
     }
